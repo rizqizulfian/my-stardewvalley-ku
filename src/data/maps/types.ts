@@ -24,10 +24,8 @@ export interface MapDef {
     reeds: number;
     /** Chance of a lily pad on open water. */
     lilies: number;
-    /** 0..1 coverage of lighter meadow patches. */
+    /** 0..1 coverage of darker meadow patches. */
     meadow: number;
-    /** Chance of mushrooms on a grass cell next to a tree. */
-    mushrooms?: number;
   };
   /** Music track id per time of day. */
   music: Record<TimeOfDay, string>;

@@ -16,7 +16,7 @@ import {
   TERRAIN_TEXTURES,
   WATER_FRAMES,
 } from '../art/terrain';
-import { FLOWER_VARIANTS, MUSHROOM_VARIANTS, PEBBLE_VARIANTS, PROP_TEXTURES } from '../art/props';
+import { FLOWER_VARIANTS, PEBBLE_VARIANTS, PROP_TEXTURES } from '../art/props';
 import { TERRAIN } from '../data/terrain';
 import type { WorldMap } from './WorldMap';
 
@@ -44,8 +44,6 @@ export interface RenderedMap {
   lights: NightLight[];
   /** Tree sprites, used to spawn falling leaves. */
   trees: Phaser.GameObjects.Sprite[];
-  /** World positions where chimney smoke rises. */
-  chimneys: Array<{ x: number; y: number }>;
   update(timeMs: number): void;
   destroy(): void;
 }
@@ -113,7 +111,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
       const mm = maskAt(i, j, meadowCell);
       if (mm) meadow.putTileAt(GID.meadow + (mm === FULL ? fullVariant(i, j, 31) : mm), i, j);
       const pm = maskAt(i, j, pathCell);
-      if (pm) path.putTileAt(GID.path + (pm === FULL ? fullVariant(i, j, 41) : pm), i, j);
+      if (pm) path.putTileAt(GID.path + pm, i, j);
       const wm = maskAt(i, j, waterCell);
       if (wm) {
         const tile = wm === FULL ? fullVariant(i, j, 37) : wm;
@@ -137,9 +135,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
           // A cliff that runs off the map edge has no end cap there.
           const l = x > 0 && !TERRAIN[map.kindAt(x - 1, y)].cliff;
           const r = x < map.w - 1 && !TERRAIN[map.kindAt(x + 1, y)].cliff;
-          const alt = Math.floor(hash2(x, 0, seed + 60) * (CLIFF_TILE.faceMidAlt.length + 1));
-          const mid = alt === 0 ? CLIFF_TILE.faceMid : CLIFF_TILE.faceMidAlt[alt - 1];
-          const frame = l && r ? CLIFF_TILE.faceSingle : l ? CLIFF_TILE.faceLeft : r ? CLIFF_TILE.faceRight : mid;
+          const frame = l && r ? CLIFF_TILE.faceSingle : l ? CLIFF_TILE.faceLeft : r ? CLIFF_TILE.faceRight : CLIFF_TILE.faceMid;
           cliff.putTileAt(GID.cliff + frame + half, x, y);
         }
         if (y + 1 < map.h && !TERRAIN[map.kindAt(x, y + 1)].cliff && !t.stairs) cliffShadow.putTileAt(GID.cliff + CLIFF_TILE.shadowBelow, x, y + 1);
@@ -162,8 +158,6 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
   const emissives: Phaser.GameObjects.Image[] = [];
   const lights: NightLight[] = [];
   const trees: Phaser.GameObjects.Sprite[] = [];
-  const chimneys: Array<{ x: number; y: number }> = [];
-  const treeCells = new Set<number>();
   for (const p of map.props) {
     const d = p.def;
     const jitter = d.jitter ? Math.round((hash2(p.cx, p.cy, seed + 3) - 0.5) * 2 * d.jitter) : 0;
@@ -174,18 +168,14 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
     s.setDepth(d.flat ? DEPTH.groundDecor : worldDepth(y));
     objects.push(s);
     if (d.shadow) {
-      const sh = scene.add.image(x, y - 1 + (d.shadowOffsetY ?? 0), d.shadow).setOrigin(0.5, 0.5);
+      const sh = scene.add.image(x, y - 1 + (d.shadowOffsetY ?? 0), d.shadow).setOrigin(0.5, 0.5).setAlpha(0.35);
       sh.setDepth(DEPTH.groundDecor + 0.5);
       objects.push(sh);
     }
     if (d.sway) {
       swayers.push({ sprite: s, x, slow: d.texture.includes('tree') });
-      if (d.texture.includes('tree')) {
-        trees.push(s);
-        treeCells.add(map.index(p.cx, p.cy));
-      }
+      if (d.texture.includes('tree')) trees.push(s);
     }
-    if (d.smoke) chimneys.push({ x: x + d.smoke.x, y: y + d.smoke.y });
     if (d.emissive) {
       const e = scene.add.image(x, y, d.emissive).setOrigin(0.5, 1).setDepth(s.depth + 0.01).setVisible(false);
       emissives.push(e);
@@ -238,11 +228,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
       const r = hash2(x, y, seed + 21);
       const px = x * T + 3 + Math.floor(hash2(x, y, seed + 22) * (T - 6));
       const py = y * T + 4 + Math.floor(hash2(x, y, seed + 23) * (T - 6));
-      const byTree = [treeCells.has(map.index(x - 1, y)), treeCells.has(map.index(x + 1, y)), treeCells.has(map.index(x, y + 1))].some(Boolean);
-      if (byTree && hash2(x, y, seed + 30) < (dec.mushrooms ?? 0)) {
-        const f = Math.floor(hash2(x, y, seed + 31) * MUSHROOM_VARIANTS);
-        objects.push(scene.add.image(px, py, PROP_TEXTURES.mushrooms, f).setOrigin(0.5, 1).setDepth(worldDepth(py)));
-      } else if (r < dec.flowers) {
+      if (r < dec.flowers) {
         const f = Math.floor(hash2(x, y, seed + 24) * FLOWER_VARIANTS);
         objects.push(scene.add.image(px, py, PROP_TEXTURES.flowers, f).setDepth(DEPTH.groundDecor));
       } else if (r < dec.flowers + dec.tufts) {
@@ -266,7 +252,6 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
     emissives,
     lights,
     trees,
-    chimneys,
     update(timeMs: number) {
       if (timeMs >= nextWater) {
         nextWater = timeMs + ATMOSPHERE.waterFrameMs;

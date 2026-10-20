@@ -19,7 +19,7 @@ Press any key on the start screen to begin (this also starts audio).
 | Folder | What lives there |
 | --- | --- |
 | `src/config.ts` | Every tunable (resolution, speeds, timings, audio levels, depths). |
-| `src/art/` | `palette.ts` (the material ramps from `docs/style-guide.json`), `pixel.ts` (toolkit), and generators for terrain, props, characters, fx/UI, font. |
+| `src/art/` | `palette.ts` (the 32 colours), `pixel.ts` (toolkit), and generators for terrain, props, characters, fx/UI, font. |
 | `src/audio/` | `AudioManager` (the only audio API), generative sequencer, instruments, ambience, SFX. |
 | `src/data/` | Maps, terrain kinds, props, characters, music tracks, ambience curves, day/night grading. |
 | `src/systems/` | Game state, time, map parsing/collision, map rendering, atmosphere. |
@@ -29,7 +29,7 @@ Press any key on the start screen to begin (this also starts audio).
 
 ## Art pipeline
 
-* `docs/style-guide.json` is the art direction (ramps, outlines, materials, density). `palette.ts` holds the only colours. Grids store palette indices, so nothing off-palette can be drawn.
+* `palette.ts` holds the only colours. Grids store palette indices, so nothing off-palette can be drawn.
   The day/night grade (multiply + additive sky light) and light halos are post effects on top.
 * `pixel.ts`: `PixelGrid` (parse string grids with a legend, draw, stamp, flip, sway-shear, recolour),
   `shade()` (3–5 tone ramp shading lit from the top-left), `outline()` (outline in a darker hue-shifted

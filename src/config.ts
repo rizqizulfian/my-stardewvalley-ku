@@ -25,7 +25,7 @@ export const PLAYER = {
   feetWidth: 10,
   feetHeight: 5,
   frameWidth: 16,
-  frameHeight: 32,
+  frameHeight: 24,
   /** Milliseconds per walk-cycle frame. */
   walkFrameMs: 140,
   /** Milliseconds per idle (breathing) frame. */
@@ -65,8 +65,6 @@ export const ATMOSPHERE = {
   leafMaxAlive: 14,
   fireflyMaxAlive: 10,
   fireflySpawnEveryMs: 700,
-  smokeEveryMs: 650,
-  smokeMaxAlive: 12,
   /** Milliseconds per sway frame for grass and trees. */
   swayFrameMs: 420,
   waterFrameMs: 260,

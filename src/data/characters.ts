@@ -16,12 +16,13 @@ export const PLAYER_CHARACTER: CharacterDef = {
   texture: 'char-player',
   look: {
     hair: ['bark', 'umber', 'clay'],
-    skin: ['umber', 'skinShade', 'skin', 'skinLight'],
+    skin: ['umber', 'skinShade', 'skin', 'peach'],
     eye: 'night',
     shirt: ['wine', 'brick', 'coral', 'peach'],
     pants: ['deep', 'sea', 'sky'],
     shoes: ['bark', 'umber'],
-    hat: { style: 'caping', ramp: ['dirtDark', 'dirt', 'dirtLight', 'dirtHi'] },
+    hairStyle: 'short',
+    hat: { style: 'caping', ramp: ['clay', 'amber', 'gold', 'cream'] },
   },
 };
 

@@ -1,7 +1,7 @@
 // Prop definitions. Map prop rows place these by character; the character
 // marks the bottom-left cell of the prop's footprint.
 
-import { HOUSE_CHIMNEY, PROP_TEXTURES } from '../art/props';
+import { PROP_TEXTURES } from '../art/props';
 import type { Surface } from './terrain';
 
 export interface Box {
@@ -44,8 +44,6 @@ export interface PropDef {
   surface?: Surface;
   /** Small horizontal jitter, in pixels, so rows of trees do not look gridded. */
   jitter?: number;
-  /** Chimney smoke source, offset from the prop's bottom-centre in pixels. */
-  smoke?: { x: number; y: number };
 }
 
 export const PROPS: Record<string, PropDef> = {
@@ -71,16 +69,6 @@ export const PROPS: Record<string, PropDef> = {
   },
   treeSlender: {
     texture: PROP_TEXTURES.treeSlender,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 4, y: 10, w: 8, h: 5 },
-    offsetY: 1,
-    sway: true,
-    shadow: PROP_TEXTURES.shadowM,
-    shadowOffsetY: 1,
-    jitter: 3,
-  },
-  treeSmall: {
-    texture: PROP_TEXTURES.treeSmall,
     footprint: { w: 1, h: 1 },
     collider: { x: 4, y: 10, w: 8, h: 5 },
     offsetY: 1,
@@ -182,7 +170,6 @@ export const PROPS: Record<string, PropDef> = {
       { x: 20, y: -21, texture: 'light-window', scale: 0.9 },
     ],
     surface: 'wood',
-    smoke: { x: HOUSE_CHIMNEY.x, y: HOUSE_CHIMNEY.y },
   },
   lumbung: {
     texture: PROP_TEXTURES.lumbung,
@@ -191,51 +178,6 @@ export const PROPS: Record<string, PropDef> = {
     shadow: PROP_TEXTURES.shadowL,
     emissive: PROP_TEXTURES.lumbungLit,
     lights: [{ x: 0, y: -22, texture: 'light-window', scale: 0.7 }],
-  },
-  barrel: {
-    texture: PROP_TEXTURES.barrel,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 2, y: 8, w: 12, h: 7 },
-    shadow: PROP_TEXTURES.shadowS,
-    surface: 'wood',
-    jitter: 1,
-  },
-  crate: {
-    texture: PROP_TEXTURES.crate,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 2, y: 6, w: 12, h: 9 },
-    shadow: PROP_TEXTURES.shadowS,
-    surface: 'wood',
-  },
-  hay: {
-    texture: PROP_TEXTURES.hay,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 0, y: 5, w: 16, h: 9 },
-    shadow: PROP_TEXTURES.shadowM,
-  },
-  scarecrow: {
-    texture: PROP_TEXTURES.scarecrow,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 5, y: 10, w: 6, h: 5 },
-    shadow: PROP_TEXTURES.shadowS,
-  },
-  sign: {
-    texture: PROP_TEXTURES.sign,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 5, y: 10, w: 6, h: 5 },
-    shadow: PROP_TEXTURES.shadowS,
-  },
-  woodpile: {
-    texture: PROP_TEXTURES.woodpile,
-    footprint: { w: 2, h: 1 },
-    collider: { x: 2, y: 4, w: 28, h: 10 },
-    shadow: PROP_TEXTURES.shadowL,
-  },
-  flowerBed: {
-    texture: PROP_TEXTURES.flowerBed,
-    footprint: { w: 1, h: 1 },
-    sway: true,
-    jitter: 2,
   },
 };
 
@@ -258,12 +200,4 @@ export const PROP_LEGEND: Record<string, keyof typeof PROPS> = {
   M: 'mailbox',
   H: 'house',
   K: 'lumbung',
-  O: 'treeSmall',
-  u: 'barrel',
-  c: 'crate',
-  h: 'hay',
-  C: 'scarecrow',
-  s: 'sign',
-  w: 'woodpile',
-  o: 'flowerBed',
 };

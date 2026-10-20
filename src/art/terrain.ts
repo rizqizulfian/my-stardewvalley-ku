@@ -1,17 +1,14 @@
-// Terrain tilesets, all drawn procedurally (see docs/style-guide.json).
+// Terrain tilesets, all drawn procedurally.
 //
 // Paths, water and grass patches use a dual-grid (corner-based) autotile: each
 // display tile sits between four map cells and is chosen by which of those
 // four corners hold the terrain. That gives 16 tiles per terrain with proper
 // inner and outer corners. The field used to draw them is continuous and the
 // noise is periodic per tile, so edges always meet seamlessly.
-//
-// Terrain has no outlines. Texture comes from small hand-placed clusters
-// (blades, pebbles, ripples), never from dither or per-pixel noise.
 
 import { RENDER } from '../config';
-import { PixelGrid, hash2, valueNoise, type TextureSink } from './pixel';
-import type { ColorName } from './palette';
+import { PixelGrid, ditherPick, hash2, valueNoise, shade, outline, type TextureSink } from './pixel';
+import { RAMPS, type ColorName } from './palette';
 
 const T = RENDER.tileSize;
 
@@ -24,7 +21,7 @@ export const TERRAIN_TEXTURES = {
   cliff: 'tiles-cliff',
 } as const;
 
-export const GRASS_VARIANTS = 8;
+export const GRASS_VARIANTS = 6;
 export const WATER_FRAMES = 4;
 export const DUAL_TILE_COUNT = 16;
 /** Extra variants of the fully-covered dual tile (mask 15) to break up repetition. */
@@ -32,7 +29,6 @@ export const FULL_VARIANTS = 4;
 /** Water tiles per animation frame: 16 masks, then full variants. */
 export const WATER_TILES_PER_FRAME = DUAL_TILE_COUNT + FULL_VARIANTS;
 export const MEADOW_TILES = DUAL_TILE_COUNT + FULL_VARIANTS;
-export const PATH_TILES = DUAL_TILE_COUNT + FULL_VARIANTS;
 
 /** Corner bits for dual-grid masks. */
 export const CORNER = { TL: 1, TR: 2, BL: 4, BR: 8 } as const;
@@ -49,8 +45,6 @@ export const CLIFF_TILE = {
   edgeWest: 11,
   edgeNorth: 12,
   shadowBelow: 13,
-  /** Extra plain-face pairs, chosen at random for long cliff runs. */
-  faceMidAlt: [14, 16],
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -82,112 +76,84 @@ function dualTile(mask: number, seed: number, wobble: number, paint: Painter): P
   return g;
 }
 
-/** Place a small hand-drawn mark: rows of characters, '.' skipped. */
-function mark(g: PixelGrid, x: number, y: number, rows: readonly string[], colors: Record<string, ColorName>, onlyOn?: readonly ColorName[]): boolean {
-  for (let j = 0; j < rows.length; j++)
-    for (let i = 0; i < rows[j].length; i++) {
-      if (rows[j][i] === '.') continue;
-      const px = x + i;
-      const py = y + j;
-      if (px < 0 || py < 0 || px >= g.w || py >= g.h) return false;
-      if (onlyOn && !onlyOn.includes(g.colorAt(px, py) as ColorName)) return false;
-    }
-  for (let j = 0; j < rows.length; j++)
-    for (let i = 0; i < rows[j].length; i++) {
-      const ch = rows[j][i];
-      if (ch !== '.') g.set(x + i, y + j, colors[ch]);
-    }
-  return true;
-}
-
 // ---------------------------------------------------------------------------
-// Grass (per cell): base green with lighter blades, darker clumps, rare flowers.
-
-const BLADE_MARKS: ReadonlyArray<readonly string[]> = [
-  // Single blade.
-  ['L', 'L'],
-  // V tuft over a dark root.
-  ['L.L', '.D.'],
-  // Three-blade tuft.
-  ['.H.', 'L.L', 'DLD'],
-  // Leaning pair.
-  ['L..', '.L.', '.DL'],
-  // Darker clump with a lit blade.
-  ['.L.', 'D.D', 'DDD'],
-  // Short dash.
-  ['LL'],
-];
+// Grass (per cell)
 
 function grassTile(variant: number): PixelGrid {
   const g = new PixelGrid(T, T).fillRect(0, 0, T, T, 'grass');
-  const colors: Record<string, ColorName> = { L: 'grassLight', H: 'grassHi', D: 'turf' };
   const r = (i: number) => hash2(variant, i, 77);
-  const count = [1, 3, 4, 2, 5, 3, 4, 2][variant % GRASS_VARIANTS];
-  for (let i = 0; i < count; i++) {
-    const m = BLADE_MARKS[Math.floor(r(i * 4) * BLADE_MARKS.length)];
-    const x = 1 + Math.floor(r(i * 4 + 1) * (T - 4));
-    const y = 1 + Math.floor(r(i * 4 + 2) * (T - 4));
-    mark(g, x, y, m, colors, ['grass']);
+  const marks = [5, 3, 6, 2, 4, 7][variant % 6];
+  for (let i = 0; i < marks; i++) {
+    const x = 2 + Math.floor(r(i * 3) * (T - 5));
+    const y = 3 + Math.floor(r(i * 3 + 1) * (T - 5));
+    const kind = r(i * 3 + 2);
+    if (kind < 0.55) {
+      // Small tuft: dark base, lit tip toward the top-left.
+      g.set(x, y, 'leaf').set(x + 1, y, 'leaf').set(x, y - 1, 'lime');
+      if (kind < 0.25) g.set(x + 1, y - 1, 'grass').set(x + 2, y, 'leaf');
+    } else {
+      // Small V tuft.
+      g.set(x, y, 'leaf').set(x - 1, y - 1, 'leaf').set(x + 1, y - 1, 'leaf').set(x - 1, y - 2, 'lime').set(x + 1, y - 2, 'lime');
+    }
   }
-  // Rare tiny flower.
-  if (variant === 6) mark(g, 10, 4, ['.g.', 'gcg', '.D.'], { g: 'gold', c: 'cream', D: 'turf' });
-  if (variant === 7) mark(g, 4, 10, ['c', 'D'], { c: 'cream', D: 'turf' });
+  if (variant === 5) {
+    // Tiny pebble.
+    g.set(9, 9, 'haze').set(10, 9, 'mauve').set(9, 10, 'mauve').set(10, 10, 'plum');
+  }
   return g;
 }
 
 // ---------------------------------------------------------------------------
-// Meadow patches: sunlit, lighter grass areas for large-scale variation.
+// Meadow patches: darker dithered grass areas for large-scale variation.
 
 function meadowTile(mask: number, variant = 0): PixelGrid {
-  const g = dualTile(mask, 11, 0.55, (_x, _y, F) => (F(0, 0) >= 0.52 ? 'grassLight' : null));
-  const colors: Record<string, ColorName> = { L: 'grassHi', D: 'grass', H: 'grassHi' };
-  for (let i = 0; i < 4; i++) {
-    const m = BLADE_MARKS[Math.floor(hash2(i, mask * 5 + variant, 131) * BLADE_MARKS.length)];
-    const x = 1 + Math.floor(hash2(i, mask * 5 + variant, 132) * (T - 4));
-    const y = 1 + Math.floor(hash2(i, mask * 5 + variant, 133) * (T - 4));
-    mark(g, x, y, m, colors, ['grassLight']);
+  const g = dualTile(mask, 11, 0.5, (_x, _y, F) => {
+    const f = F(0, 0);
+    if (f < 0.5) return null;
+        // Solid darker grass; the dual-grid wobble already gives an organic edge.
+    if (f >= 0.56) return 'leaf';
+    return null;
+  });
+  // Blade marks so the patches read as taller grass, not flat paint.
+  for (let i = 0; i < 7; i++) {
+    const x = 1 + Math.floor(hash2(i, mask * 5 + variant, 131) * (T - 3));
+    const y = 2 + Math.floor(hash2(i, mask * 5 + variant, 132) * (T - 3));
+    if (g.colorAt(x, y) === 'leaf' && g.colorAt(x + 1, y) === 'leaf' && g.colorAt(x, y - 1) === 'leaf') {
+      g.set(x, y, 'moss').set(x, y - 1, 'grass');
+      if (hash2(i, variant, 133) < 0.5) g.set(x + 1, y - 1, 'lime');
+    }
   }
   return g;
 }
 
 // ---------------------------------------------------------------------------
-// Dirt path: orange-gold with pebbles and lighter speckles, organic edges.
+// Dirt path
 
-function pathTile(mask: number, variant = 0): PixelGrid {
-  const g = dualTile(mask, 23, 0.32, (_x, _y, F) => {
+function pathTile(mask: number): PixelGrid {
+  const g = dualTile(mask, 23, 0.12, (_x, _y, F) => {
     const f = F(0, 0);
-    if (f < 0.5) return null;
-    // The grass lip shades the top of the sunken path; the far rim catches light.
-    if (F(0, -1) < 0.5) return 'dirtShade';
-    if (F(-1, 0) < 0.5) return 'dirtShade';
-    if (F(0, 1) < 0.5 || F(1, 0) < 0.5) return 'dirtLight';
-    return 'dirt';
-  });
-  // Grass blades leaning over the top edge.
-  for (let x = 0; x < T; x++)
-    for (let y = 1; y < T; y++) {
-      if (g.colorAt(x, y) === 'dirtShade' && !g.filled(x, y - 1) && hash2(x, y, 300 + variant) < 0.22) {
-        g.set(x, y, 'grass');
-        break;
-      }
+    if (f >= 0.5) {
+      // Sunken dirt: the grass lip shades the top, the far rim catches light.
+      if (F(0, -1) < 0.5) return 'umber';
+      if (F(0, -2) < 0.5) return 'clay';
+      if (F(-1, 0) < 0.5) return 'clay';
+      if (F(0, 1) < 0.5 || F(1, 0) < 0.5) return 'sand';
+      // Clean sandy dirt; pebbles are added below.
+      return 'tan';
     }
-  const seed = mask * 13 + variant * 101;
-  const colors: Record<string, ColorName> = { s: 'dirtShade', l: 'dirtLight', h: 'dirtHi', d: 'dirtDark' };
-  const pebbles: ReadonlyArray<readonly string[]> = [
-    ['ls', 'ss'],
-    ['hl', 'sd'],
-    ['.l.', 'lss', '.s.'],
-    ['ls'],
-  ];
-  const speckles: ReadonlyArray<readonly string[]> = [['ll'], ['l.', '.l'], ['hl', 'l.'], ['l']];
-  const n = mask === 15 ? 3 + (variant % 2) : 2;
-  for (let i = 0; i < n; i++) {
-    const isPebble = hash2(i, seed, 40) < 0.55;
-    const set = isPebble ? pebbles : speckles;
-    const m = set[Math.floor(hash2(i, seed, 41) * set.length)];
-    const x = 1 + Math.floor(hash2(i, seed, 42) * (T - 4));
-    const y = 1 + Math.floor(hash2(i, seed, 43) * (T - 4));
-    mark(g, x, y, m, colors, ['dirt']);
+    // Grass side of the edge: overhanging blades above the dirt, dark ring elsewhere.
+    // Grass side of the edge: a clean darker ring.
+    if (f >= 0.45) return 'leaf';
+    return null;
+  });
+  // Pebbles: lit top-left pixel, shadow under-right, only on open dirt.
+  for (let i = 0; i < 4; i++) {
+    const x = 2 + Math.floor(hash2(mask, i, 41) * (T - 5));
+    const y = 3 + Math.floor(hash2(mask, i, 42) * (T - 6));
+    if (g.colorAt(x, y) && g.colorAt(x + 1, y + 1) && g.colorAt(x, y - 2) !== 'leaf' && g.colorAt(x, y) !== 'leaf') {
+      const c = g.colorAt(x, y)!;
+      if (c === 'clay' || c === 'tan') g.set(x, y, 'sand').set(x + 1, y, 'tan').set(x, y + 1, 'umber').set(x + 1, y + 1, 'umber');
+    }
   }
   return g;
 }
@@ -196,172 +162,168 @@ function pathTile(mask: number, variant = 0): PixelGrid {
 // Water, 4 animation frames
 
 function waterTile(mask: number, frame: number, variant = 0): PixelGrid {
+  const phase = (frame / WATER_FRAMES) * Math.PI * 2;
+  const foamBand = 0.07 + 0.035 * Math.sin(phase);
   const seed = mask * 7 + variant * 101;
   const g = dualTile(mask, 31, 0.36, (_x, _y, F) => {
     const f = F(0, 0);
-    if (f < 0.5) return null;
-    // North bank: the earth face of the land drops into the water (3/4 view).
-    if (F(0, -1) < 0.5) return 'grassLight';
-    if (F(0, -2) < 0.5) return 'earthLight';
-    if (F(0, -3) < 0.5) return 'earth';
-    if (F(0, -4) < 0.5) return 'earthDark';
-    if (F(0, -5) < 0.5) return 'deep';
-    // A darker blue band where the water meets the bank.
-    if (F(0, -7) < 0.5 || F(-2, 0) < 0.5 || F(2, 0) < 0.5 || F(0, 2) < 0.5) return 'sea';
-    // Lit shore foam on the near (south) edge.
-    return 'sky';
+    if (f >= 0.5) {
+      // North bank: earth wall dropping into the water.
+      if (F(0, -1) < 0.5) return 'clay';
+      if (F(0, -2) < 0.5) return 'umber';
+      if (F(0, -3) < 0.5) return 'bark';
+      if (F(0, -4) < 0.5 || F(0, -5) < 0.5) return 'sea';
+      if (f < 0.5 + foamBand) return 'foam';
+      return 'sky';
+    }
+    // Wet, darker grass on the land side.
+    if (f >= 0.45) return 'moss';
+    return null;
   });
-  // Short ripple strokes that drift right and grow then fade over 4 frames.
-  for (let i = 0; i < 3; i++) {
-    if (hash2(i, seed, 50) < 0.3) continue;
-    const bx = Math.floor(hash2(i, seed, 51) * 10);
-    const y = 2 + Math.floor(hash2(i, seed, 52) * 12);
+  // A couple of ripples per tile that drift right and fade over the 4 frames.
+  const ripples = 2;
+  for (let i = 0; i < ripples; i++) {
+    if (hash2(i, seed, 50) < 0.35) continue;
+    const bx = Math.floor(hash2(i, seed, 51) * 9);
+    const y = 4 + Math.floor(hash2(i, seed, 52) * 9);
     const life = (frame + i * 2 + variant) % WATER_FRAMES;
-    const x = 1 + ((bx + Math.floor(frame / 2)) % 10);
-    const strokes: ReadonlyArray<readonly string[]> = [[], ['ff'], ['fsf'], ['f.f']];
-    mark(g, x, y, strokes[life], { f: 'foam', s: 'spray' }, ['sky']);
+    const x = 2 + ((bx + frame) % 9);
+    const len = life === 0 ? 0 : life === 2 ? 3 : 2;
+    for (let k = 0; k < len; k++) {
+      const c = g.colorAt(x + k, y);
+      if (c === 'sky') g.set(x + k, y, k === 1 && life === 2 ? 'cream' : 'foam');
+    }
   }
   return g;
 }
 
-/** Deep-water shading: a darker body of water away from the shore. */
+/** Deep-water shading: a soft dithered overlay on cells far from the shore. */
 function deepWaterTile(mask: number): PixelGrid {
-  return dualTile(mask, 47, 0.6, (_x, _y, F) => (F(0, 0) >= 0.62 ? 'sea' : null));
+  return dualTile(mask, 47, 0.6, (x, y, F) => {
+    const f = F(0, 0);
+    if (f < 0.5) return null;
+    // Solid darker water with a soft, clumpy edge.
+    const t = Math.min(1, (f - 0.5) / 0.3);
+    const n = valueNoise((x + T) / 3, (y + T) / 3, 29, T / 3);
+    return t > 0.6 || n < t ? 'sea' : null;
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Cliffs (per cell): bright grass lip, earth face in strata, stones and roots.
+// Cliffs (per cell)
 
 /** Cliff faces are two cells tall: drawn as one 16x32 piece, then cut in half. */
 const FACE_H = T * 2;
-const LIP = 3;
 
-/** Seamless wave across a 16px tile. */
-function wave(x: number, k: number, phase: number, amp: number): number {
-  return Math.round(Math.sin(((x + phase) / T) * Math.PI * 2 * k) * amp);
-}
-
-function cliffFace(left: boolean, right: boolean, variant = 0): [PixelGrid, PixelGrid] {
+function cliffFace(left: boolean, right: boolean): [PixelGrid, PixelGrid] {
   const g = new PixelGrid(T, FACE_H);
-  // Strata: light upper band, base middle band, dark lower band.
-  for (let x = 0; x < T; x++) {
-    const b1 = LIP + 8 + wave(x, 1, 3, 1);
-    const b2 = LIP + 18 + wave(x, 2, 1, 1);
-    for (let y = LIP; y < FACE_H; y++) {
-      let c: ColorName = y < b1 ? 'earthLight' : y < b2 ? 'earth' : 'earthDark';
-      if (y >= FACE_H - 2) c = 'bark';
-      g.set(x, y, c);
-    }
-    // Shaded seam under each band edge.
-    if (b1 < FACE_H) g.set(x, b1, 'earth');
-    if (b2 + 1 < FACE_H) g.set(x, b2, 'earthDark');
-  }
-  // Short strata dashes in a darker tone, light flecks, embedded stones and
-  // hanging roots, placed differently per variant.
-  const r = (i: number) => hash2(i, variant, 400);
-  const bands: Array<[number, number, ColorName]> = [
-    [LIP + 2, LIP + 7, 'earth'],
-    [LIP + 11, LIP + 17, 'earthDark'],
-    [LIP + 20, LIP + 26, 'bark'],
+  const lip = 3;
+  // Carve rounded ends.
+  const inShape = (px: number, py: number) => {
+    const v = (py - lip) / (FACE_H - lip);
+    const inset = Math.round(3 * (1 - Math.sin(Math.min(1, v * 1.4) * Math.PI * 0.5)) + 1);
+    if (left && px < inset) return false;
+    if (right && px > T - 1 - inset) return false;
+    return py >= 0;
+  };
+  // Stones in staggered courses. Each stone is drawn three times (x-16, x, x+16)
+  // so the mid tile wraps seamlessly when repeated side by side.
+  const courses = [
+    { y: lip, h: 9 },
+    { y: lip + 9, h: 8 },
+    { y: lip + 17, h: 7 },
+    { y: lip + 24, h: 5 },
   ];
-  bands.forEach(([y0, y1, c], b) => {
-    for (let k = 0; k < 2; k++) {
-      const x = Math.floor(r(b * 10 + k * 3) * T);
-      const y = y0 + Math.floor(r(b * 10 + k * 3 + 1) * (y1 - y0));
-      const len = 2 + Math.floor(r(b * 10 + k * 3 + 2) * 3);
-      for (let i = 0; i < len; i++) g.set((x + i) % T, y, c);
+  courses.forEach((c, ci) => {
+    let x = ci % 2 === 0 ? -3 : 2;
+    let si = 0;
+    while (x < T) {
+      const w = 5 + Math.floor(hash2(ci, si, 61) * 4);
+      const mask = new PixelGrid(T, FACE_H);
+      for (const ox of [-T, 0, T]) {
+        mask.fillRect(x + ox + 1, c.y, w - 2, c.h - 1, 'ink');
+        mask.fillRect(x + ox, c.y + 1, w, c.h - 3, 'ink');
+      }
+      const bias = 0.08 - ci * 0.06 + (hash2(ci, si, 62) - 0.5) * 0.15;
+      g.stamp(shade(mask, RAMPS.stone.slice(0, 4), { rim: 0.32, gradient: 0.5, bias, dither: 0.25, noise: 0.05, seed: ci * 10 + si }));
+      x += w;
+      si++;
     }
   });
-  for (let k = 0; k < 2; k++) {
-    const x = Math.floor(r(40 + k) * (T - 1));
-    const y = LIP + 2 + Math.floor(r(45 + k) * 5);
-    g.set(x, y, 'tan').set(x + 1, y, 'tan');
-  }
-  const stone = (x: number, y: number, w: number) => {
-    for (let k = 0; k < w; k++) g.set((x + k) % T, y, k === 0 ? 'stoneLight' : 'stone').set((x + k) % T, y + 1, k === w - 1 ? 'slate' : 'stoneDark');
-  };
-  for (let k = 0; k < 1 + (variant % 2) + 1; k++) stone(Math.floor(r(50 + k) * T), LIP + 8 + Math.floor(r(55 + k) * 14), 2 + Math.floor(r(60 + k) * 2));
-  // Roots hanging from the lip.
-  for (let k = 0; k < 2; k++) {
-    if (r(70 + k) < 0.3) continue;
-    const x = 1 + Math.floor(r(72 + k) * (T - 3));
-    const len = 3 + Math.floor(r(74 + k) * 4);
-    for (let i = 0; i < len; i++) g.set(x + (i > 2 ? 1 : 0), LIP + i, i === len - 1 ? 'umber' : 'bark');
-  }
-  // Grass lip: bright top edge, base below, blades dripping over the face.
-  for (let x = 0; x < T; x++) {
-    g.set(x, 0, hash2(x, 0, 66) < 0.3 ? 'grassHi' : 'grassLight').set(x, 1, 'grassLight').set(x, 2, 'grass');
-    const hang = Math.floor(hash2(x, variant, 69) * 3);
-    for (let k = 0; k < hang; k++) g.set(x, LIP + k, k === hang - 1 ? 'turf' : 'grass');
-  }
-
-  // Rounded end caps: the lit (left) end shows a light earth rim, the right end a dark one.
-  const inset = (y: number) => {
-    const v = (y - LIP) / (FACE_H - LIP);
-    return Math.round(3 * (1 - Math.sin(Math.min(1, v * 1.4) * Math.PI * 0.5)) + 1);
-  };
-  for (let y = 0; y < FACE_H; y++) {
-    const i = y < LIP ? 0 : inset(y);
-    if (left) {
-      for (let x = 0; x < i; x++) g.set(x, y, null);
-      if (y >= LIP) g.set(i, y, y > FACE_H - 4 ? 'earthDark' : 'earthLight');
-      else g.set(0, y, 'grassHi');
+  // Mortar shadows fill the gaps.
+  for (let py = lip; py < FACE_H; py++)
+    for (let px = 0; px < T; px++) if (!g.filled(px, py)) g.set(px, py, py > FACE_H - 8 ? 'ink' : 'night');
+  // Moss and hanging vines.
+  for (let px = 0; px < T; px++) {
+    const vine = hash2(px, 3, 70);
+    if (vine < 0.22) {
+      const len = 4 + Math.floor(hash2(px, 4, 71) * 10);
+      for (let k = 0; k < len; k++) g.set(px, lip + k, k === len - 1 ? 'grass' : k % 3 === 2 ? 'leaf' : 'moss');
     }
-    if (right) {
-      for (let x = T - i; x < T; x++) g.set(x, y, null);
-      if (y >= LIP) g.set(T - 1 - i, y, 'earthDark');
-      else g.set(T - 1, y, 'grass');
-    }
+  }
+  // Grass lip overhang.
+  for (let px = 0; px < T; px++) {
+    g.set(px, 0, 'grass').set(px, 1, hash2(px, 1, 68) < 0.35 ? 'lime' : 'grass').set(px, 2, 'leaf');
+    const hang = Math.floor(hash2(px, 0, 69) * 3);
+    for (let k = 0; k < hang; k++) g.set(px, lip + k, k === hang - 1 ? 'pine' : 'leaf');
+  }
+  // Damp contact line at the base.
+  for (let px = 0; px < T; px++) g.set(px, FACE_H - 1, 'ink');
+  // Carve the end caps and outline them with a darker stone shade.
+  for (let py = 0; py < FACE_H; py++) for (let px = 0; px < T; px++) if (!inShape(px, py)) g.set(px, py, null);
+  if (left || right) {
+    const o = outline(g, { steps: 1 });
+    for (let py = 0; py < FACE_H; py++)
+      for (let px = 0; px < T; px++) if (!g.filled(px, py) && o.filled(px, py)) g.set(px, py, py < lip ? 'moss' : 'night');
   }
   return [g.crop(0, 0, T, T), g.crop(0, T, T, T)];
 }
 
 function stairsTile(): [PixelGrid, PixelGrid] {
   const g = new PixelGrid(T, FACE_H);
-  // Earth cheek walls, lit on the left and shaded on the right.
-  g.fillRect(0, LIP, 3, FACE_H - LIP, 'earthLight').fillRect(T - 3, LIP, 3, FACE_H - LIP, 'earthDark');
-  g.fillRect(2, LIP, 1, FACE_H - LIP, 'earth').fillRect(T - 3, LIP, 1, FACE_H - LIP, 'earth');
-  // Stone steps: light tread, base riser, dark lip shadow.
+  // Stone cheek walls.
+  g.stamp(shade(new PixelGrid(T, FACE_H).fillRect(0, 2, 3, FACE_H - 2, 'ink'), RAMPS.stone.slice(0, 4), { rim: 0.3, dither: 0.5 }));
+  g.stamp(shade(new PixelGrid(T, FACE_H).fillRect(T - 3, 2, 3, FACE_H - 2, 'ink'), RAMPS.stone.slice(0, 4), { rim: 0.3, bias: -0.15, dither: 0.5 }));
+  // Steps: lit tread, darker riser, chipped edges.
   const steps = 7;
-  const sh = Math.floor((FACE_H - LIP) / steps);
+  const sh = Math.floor((FACE_H - 3) / steps);
   for (let s = 0; s < steps; s++) {
-    const y = LIP + s * sh;
-    for (let x = 3; x < T - 3; x++) {
-      g.set(x, y, x === 3 ? 'cream' : 'stoneLight');
-      for (let k = 1; k < sh; k++) g.set(x, y + k, k === sh - 1 ? 'stoneDark' : 'stone');
+    const y = 3 + s * sh;
+    for (let px = 3; px < T - 3; px++) {
+      g.set(px, y, px < 6 ? 'mist' : hash2(px, s, 5) < 0.15 ? 'mauve' : 'haze');
+      for (let k = 1; k < sh; k++) g.set(px, y + k, k === sh - 1 ? 'plum' : 'mauve');
     }
-    g.set(T - 4, y, 'stone');
   }
-  for (let y = LIP + steps * sh; y < FACE_H; y++) for (let x = 3; x < T - 3; x++) g.set(x, y, 'stoneDark');
-  for (let x = 0; x < T; x++) g.set(x, 0, 'grassLight').set(x, 1, 'grassLight').set(x, 2, x < 3 || x > T - 4 ? 'grass' : 'stoneDark');
+  for (let px = 0; px < T; px++) g.set(px, 0, 'grass').set(px, 1, 'leaf').set(px, 2, px < 3 || px > T - 4 ? 'moss' : 'plum');
+  for (let py = 3 + steps * sh; py < FACE_H; py++) for (let px = 3; px < T - 3; px++) g.set(px, py, 'plum');
   return [g.crop(0, 0, T, T), g.crop(0, T, T, T)];
 }
 
-/** Plateau edges that drop without a cliff face: a lit or shaded grass rim. */
 function edgeTile(side: 'east' | 'west' | 'north'): PixelGrid {
   const g = new PixelGrid(T, T);
   for (let i = 0; i < T; i++) {
     const jag = hash2(i, side.length, 71) < 0.35 ? 1 : 0;
     if (side === 'east') {
-      g.set(T - 1, i, 'turf').set(T - 2, i, 'turf');
-      if (jag) g.set(T - 3, i, 'turf');
+      g.set(T - 1, i, 'moss').set(T - 2, i, 'leaf');
+      if (jag) g.set(T - 3, i, 'leaf');
     } else if (side === 'west') {
-      g.set(0, i, 'grassHi').set(1, i, 'grassLight');
-      if (jag) g.set(2, i, 'grassLight');
+      g.set(0, i, 'leaf').set(1, i, 'lime');
+      if (jag) g.set(2, i, 'lime');
     } else {
-      g.set(i, 0, 'grassHi').set(i, 1, 'grassLight');
-      if (jag) g.set(i, 2, 'grassLight');
+      g.set(i, 0, 'leaf').set(i, 1, 'lime');
+      if (jag) g.set(i, 2, 'lime');
     }
   }
   return g;
 }
 
-/** The soft contact shadow a cliff casts on the grass below it: no dither, a ragged band. */
 function shadowBelowTile(): PixelGrid {
   const g = new PixelGrid(T, T);
   for (let x = 0; x < T; x++) {
-    const depth = 2 + (hash2(x >> 1, 0, 90) < 0.5 ? 1 : 0);
-    for (let y = 0; y < depth; y++) g.set(x, y, 'turf');
+    g.set(x, 0, 'moss');
+    if (ditherPick(x, 1, 0.75)) g.set(x, 1, 'moss');
+    if (ditherPick(x, 2, 0.4)) g.set(x, 2, 'leaf');
+    if (ditherPick(x, 3, 0.15)) g.set(x, 3, 'leaf');
   }
   return g;
 }
@@ -383,7 +345,7 @@ export function registerTerrain(sink: TextureSink): void {
   );
   sink.sheet(
     TERRAIN_TEXTURES.path,
-    Array.from({ length: PATH_TILES }, (_, i) => (i < DUAL_TILE_COUNT ? pathTile(i) : pathTile(15, i))),
+    Array.from({ length: DUAL_TILE_COUNT }, (_, m) => pathTile(m)),
     T,
     T,
   );
@@ -411,8 +373,6 @@ export function registerTerrain(sink: TextureSink): void {
       edgeTile('west'),
       edgeTile('north'),
       shadowBelowTile(),
-      ...cliffFace(false, false, 1),
-      ...cliffFace(false, false, 2),
     ],
     T,
     T,

@@ -2,13 +2,12 @@
 
 import { RENDER } from '../config';
 import { PixelGrid, ditherPick, outline, shade, type TextureSink } from './pixel';
-import { PALETTE, type ColorName } from './palette';
+import { PALETTE, RAMPS, type ColorName } from './palette';
 
 export const FX_TEXTURES = {
   leaf: 'fx-leaf',
   firefly: 'fx-firefly',
   dust: 'fx-dust',
-  smoke: 'fx-smoke',
   sparkle: 'fx-sparkle',
   lightWarm: 'light-warm',
   lightWindow: 'light-window',
@@ -43,9 +42,9 @@ export const LEAF_COLORS = 3;
 
 function leafFrames(): PixelGrid[] {
   const colors: Array<[ColorName, ColorName]> = [
-    ['fern', 'leaf'],
-    ['lime', 'fern'],
-    ['amber', 'dirtShade'],
+    ['grass', 'leaf'],
+    ['lime', 'grass'],
+    ['amber', 'clay'],
   ];
   const frames: PixelGrid[] = [];
   for (const [a, b] of colors) {
@@ -59,18 +58,9 @@ function dustFrames(): PixelGrid[] {
   return [3, 5, 7].map((r, i) => {
     const g = new PixelGrid(10, 10);
     const mask = new PixelGrid(10, 10).fillEllipse(5 - r / 2, 5 - r / 2 + 1, r, r - 1, 'ink');
-    g.stamp(shade(mask, ['dirtShade', 'dirtLight', 'dirtHi'], { rim: 0.4 }));
+    g.stamp(shade(mask, RAMPS.sand.slice(0, 3), { rim: 0.4 }));
     if (i === 2) g.forEachFilled((x, y) => ditherPick(x, y, 0.5) && g.set(x, y, null));
     return g;
-  });
-}
-
-/** Chimney smoke puffs, small to large. */
-function smokeFrames(): PixelGrid[] {
-  return [3, 5, 7].map((r) => {
-    const o = Math.floor((9 - r) / 2);
-    const mask = new PixelGrid(9, 9).fillEllipse(o, o, r, r, 'ink');
-    return shade(mask, ['haze', 'mist', 'cream'], { rim: 0.35, gradient: 0.6 });
   });
 }
 
@@ -213,10 +203,9 @@ export function registerFx(sink: TextureSink): void {
   sink.sheet(FX_TEXTURES.leaf, leafFrames(), 5, 5);
   sink.image(FX_TEXTURES.firefly, new PixelGrid(3, 3).set(1, 1, 'cream').set(0, 1, 'gold').set(2, 1, 'gold').set(1, 0, 'gold').set(1, 2, 'gold'));
   sink.sheet(FX_TEXTURES.dust, dustFrames(), 10, 10);
-  sink.sheet(FX_TEXTURES.smoke, smokeFrames(), 9, 9);
   sink.sheet(FX_TEXTURES.sparkle, sparkleFrames(), 7, 7);
-  sink.canvas(FX_TEXTURES.lightWarm, lightCanvas(64, 'amber', 6));
-  sink.canvas(FX_TEXTURES.lightWindow, lightCanvas(48, 'dirtLight', 5));
+  sink.canvas(FX_TEXTURES.lightWarm, lightCanvas(64, 'coral', 6));
+  sink.canvas(FX_TEXTURES.lightWindow, lightCanvas(48, 'peach', 5));
   sink.canvas(FX_TEXTURES.vignette, vignetteCanvas());
   sink.image(FX_TEXTURES.pixel, new PixelGrid(1, 1).set(0, 0, 'cream'));
 
