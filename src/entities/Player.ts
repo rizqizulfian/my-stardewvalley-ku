@@ -97,8 +97,8 @@ export class Player {
   }
 
   private sync(): void {
-    this.sprite.setPosition(this.x, this.y);
-    this.shadow.setPosition(this.x, this.y - 1);
+    this.sprite.setPosition(Math.round(this.x), Math.round(this.y));
+    this.shadow.setPosition(Math.round(this.x), Math.round(this.y) - 1);
     this.sprite.setDepth(worldDepth(this.y));
     this.shadow.setDepth(DEPTH.groundDecor + 0.6);
   }

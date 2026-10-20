@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CAMERA, DEBUG, RENDER, TIME } from '../config';
+import { DEBUG, RENDER, TIME } from '../config';
 import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
 import { PLAYER_CHARACTER } from '../data/characters';
@@ -100,8 +100,8 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const maxX = Math.max(0, this.map.pixelWidth - cam.width);
     const maxY = Math.max(0, this.map.pixelHeight - cam.height);
-    const x = Phaser.Math.Clamp(this.player.x - cam.width / 2, 0, maxX);
-    const y = Phaser.Math.Clamp(this.player.y - CAMERA_FOCUS_OFFSET_Y - cam.height / 2, 0, maxY);
+    const x = Phaser.Math.Clamp(Math.round(this.player.x) - Math.floor(cam.width / 2), 0, maxX);
+    const y = Phaser.Math.Clamp(Math.round(this.player.y) - CAMERA_FOCUS_OFFSET_Y - Math.floor(cam.height / 2), 0, maxY);
     return [x, y];
   }
 
@@ -110,13 +110,9 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setScroll(Math.round(this.camX), Math.round(this.camY));
   }
 
-  private followCamera(delta: number): void {
-    const [tx, ty] = this.target();
-    const k = 1 - Math.pow(1 - CAMERA.followLerp, delta / (1000 / 60));
-    this.camX += (tx - this.camX) * k;
-    this.camY += (ty - this.camY) * k;
-    // Whole pixels only: no sub-pixel shimmer.
-    this.cameras.main.setScroll(Math.round(this.camX), Math.round(this.camY));
+  /** Rigid follow: player and camera share whole pixels, so there is no lag or wobble. */
+  private followCamera(_delta: number): void {
+    this.snapCamera();
   }
 }
 
