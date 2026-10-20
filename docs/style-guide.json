@@ -1,0 +1,98 @@
+{
+  "style_name": "cozy_farm_pixel_art",
+  "description": "Warm, saturated, hand-placed 16-bit farming-sim pixel art. Top-down oblique view, dense decorative detail, hue-shifted shading, no pure black.",
+
+  "technical": {
+    "tile_size_px": 16,
+    "character_size_px": "16x32",
+    "scaling": "integer only (2x, 3x, 4x), nearest-neighbor",
+    "anti_aliasing": false,
+    "sub_pixel_positioning": false,
+    "dithering": "none or minimal; texture comes from small hand-placed pixel clusters",
+    "max_colors_per_material": "3-5 shades plus outline",
+    "export": "PNG, transparent background, spritesheet with no padding bleed"
+  },
+
+  "perspective": {
+    "type": "top-down oblique (3/4 view)",
+    "rules": [
+      "show roof/top surface AND front face of buildings",
+      "no true vanishing-point perspective",
+      "front faces taller than side faces, side faces mostly hidden",
+      "cliffs show a bright top lip and a darker vertical face to read as height",
+      "objects overlap by Y-sorting (lower on screen = drawn in front)"
+    ]
+  },
+
+  "lighting": {
+    "direction": "top-left",
+    "type": "soft daylight, no cast shadows from a hard sun",
+    "mood": "warm, golden, late-morning",
+    "rules": [
+      "light faces (top, left) use the lightest shade of the ramp",
+      "shadow faces (bottom, right) use the darkest shade of the ramp",
+      "small soft dark-ground blob under trees, buildings, and objects, 1-2 shades darker than the ground, never black",
+      "highlights shift toward yellow, shadows shift toward blue/teal/purple (hue shifting)",
+      "keep the same light direction for every asset"
+    ]
+  },
+
+  "color": {
+    "overall": "warm, saturated, slightly yellowed greens, orange-gold ground, red roofs",
+    "forbidden": ["pure black #000000", "pure white #ffffff (except tiny water foam/sparkle)", "flat grey shadows", "neon colors"],
+    "shadow_rule": "never darken by only lowering brightness; also shift hue toward cool (green->teal, orange->red-brown)",
+    "ramps": {
+      "grass": { "outline": "#1f4a32", "shadow": "#2f6b4f", "base": "#5a9a3a", "light": "#8fc24a", "highlight": "#c4dc5a" },
+      "dirt_path": { "outline": "#6b3a1e", "shadow": "#9a5a2a", "base": "#d98e32", "light": "#f0b44a", "highlight": "#ffd877" },
+      "wood": { "outline": "#4a2a1a", "shadow": "#7a4524", "base": "#b0703a", "light": "#d99a55" },
+      "roof_red": { "outline": "#4a1a1a", "shadow": "#8a2a2a", "base": "#b83a2e", "light": "#d9553f", "highlight": "#f08060" },
+      "water": { "outline": "#1e4a7a", "shadow": "#2f78b8", "base": "#4aa3d8", "light": "#8fd3f0", "foam": "#e8f8ff" },
+      "cliff_earth": { "top_lip": "#8fc24a", "face_light": "#b07a3a", "face_base": "#8a5a2e", "face_shadow": "#5a3a20" },
+      "stone": { "outline": "#4a4550", "shadow": "#5a5560", "base": "#8b8478", "light": "#b8b0a0" },
+      "foliage_tree": { "outline": "#1a3a2a", "shadow": "#1f5a4a", "base": "#2f7d4a", "light": "#5aa84a", "highlight": "#a0d050" },
+      "accent_flowers": ["#e8506a", "#f5d04a", "#a070d8", "#f0f0e0"]
+    }
+  },
+
+  "outlines": {
+    "style": "selective colored outline, 1px",
+    "rule": "outline color = very dark shade of the object's own material (dark brown for wood, dark green for trees, dark red for roofs), never black",
+    "inner_lines": "avoid inner outlines; separate forms with shade changes instead",
+    "ground_tiles": "no outline on terrain tiles; edges blend through transition tiles"
+  },
+
+  "materials": {
+    "grass": "base green with scattered 1-3px lighter blades, tiny flowers, occasional darker clumps; avoid flat fill",
+    "dirt_path": "orange-gold base with small pebbles (2-3px, slightly darker) and speckled lighter patches; organic edges, not straight lines",
+    "water": "light blue with short white/cyan ripple strokes, darker blue edge near banks, 2-4 frame loop animation",
+    "wood": "visible plank lines in a darker shade, lighter top edge, darker bottom edge",
+    "roof": "horizontal rows of shingles, each row has a light top edge and dark bottom edge, a bright ridge line",
+    "cliff": "bright grass lip on top, vertical face with 2-3 tone strata, darker at the base, small stones and roots",
+    "trees": "round clustered canopy built from 3-4 leaf-clump blobs, darker underside, light top-left, short visible trunk, vary species and size",
+    "crops": "3-4 growth stages, bright saturated leaves, small colored fruit pixels, planted in tilled soil rows"
+  },
+
+  "composition_and_density": {
+    "environment": "dense and lived-in; fill empty space with small props",
+    "prop_examples": ["wooden fences", "barrels", "scarecrows", "stone steps", "bushes", "mushrooms", "flowers", "crates", "signposts", "hay bales"],
+    "rules": [
+      "avoid identical objects placed side by side; vary sprites, rotation, and spacing",
+      "paths and fields have organic, slightly irregular shapes",
+      "use clear silhouettes so every object is readable at small size",
+      "visual hierarchy: buildings and characters have the strongest contrast, terrain stays calmer"
+    ]
+  },
+
+  "animation": {
+    "fps": "4-8 for ambient loops",
+    "idle": ["water ripple", "tree sway (2 frames)", "chimney smoke", "crop sway"],
+    "character_walk": "4 frames per direction, 4 directions"
+  },
+
+  "negative_prompt": [
+    "anti-aliased edges", "blurry", "smooth gradients", "vector style", "3D render",
+    "pure black outlines", "realistic lighting", "isometric perspective",
+    "mixed pixel sizes", "rotated sprites with jagged resampling",
+    "flat single-color fills", "photographic textures", "neon palette"
+  ]
+}

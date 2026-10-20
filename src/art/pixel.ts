@@ -4,7 +4,7 @@
 // Nothing here knows about Phaser except PhaserTextureSink at the bottom.
 
 import Phaser from 'phaser';
-import { COLOR_INDEX, COLOR_NAMES, PALETTE_RGB, darker, type ColorName, type Ramp } from './palette';
+import { COLOR_INDEX, COLOR_NAMES, OUTLINE_OF, PALETTE_RGB, darker, type ColorName, type Ramp } from './palette';
 
 export const EMPTY = -1;
 
@@ -349,7 +349,7 @@ function clampIndex(i: number, n: number): number {
 }
 
 export interface OutlineOptions {
-  /** How many palette steps darker than the neighbouring fill. */
+  /** How many palette steps darker than the neighbouring fill. Default: the fill's material outline. */
   steps?: number;
   /** Include diagonal neighbours for a thicker, rounder outline. */
   diagonal?: boolean;
@@ -363,7 +363,7 @@ export interface OutlineOptions {
  * a 1px margin around the art.
  */
 export function outline(g: PixelGrid, opts: OutlineOptions = {}): PixelGrid {
-  const steps = opts.steps ?? 2;
+  const steps = opts.steps;
   const out = g.clone();
   const dirs = opts.diagonal
     ? [
@@ -388,7 +388,7 @@ export function outline(g: PixelGrid, opts: OutlineOptions = {}): PixelGrid {
       for (const [dx, dy] of dirs) {
         const c = g.colorAt(x + dx, y + dy);
         if (c) {
-          out.set(x, y, opts.color ?? darker(c, steps));
+          out.set(x, y, opts.color ?? (steps === undefined ? OUTLINE_OF[c] : darker(c, steps)));
           break;
         }
       }
@@ -436,6 +436,61 @@ export function blobMask(w: number, h: number, circles: ReadonlyArray<[number, n
       }
   }
   return g;
+}
+
+// ---------------------------------------------------------------------------
+// Volume shading without dither
+
+/** Light direction: from the top-left and slightly toward the viewer. */
+const LIGHT = (() => {
+  const v = [-0.6, -0.75, 0.3];
+  const l = Math.hypot(v[0], v[1], v[2]);
+  return [v[0] / l, v[1] / l, v[2] / l] as const;
+})();
+
+export interface BallOptions {
+  /** Shift the result lighter (+) or darker (-), in ramp fractions. */
+  bias?: number;
+  /** Amplitude of the clustered texture (0..1). Clusters are 2-3px, never single-pixel noise. */
+  cluster?: number;
+  seed?: number;
+}
+
+/**
+ * Shade the filled pixels of `mask` as if they were the visible part of an
+ * ellipsoid centred at (cx, cy) with radii (rx, ry), lit from the top-left.
+ * Tones are hard bands from the ramp; texture comes from small clusters.
+ */
+export function shadeBall(mask: PixelGrid, ramp: Ramp, cx: number, cy: number, rx: number, ry: number, opts: BallOptions = {}): PixelGrid {
+  const out = new PixelGrid(mask.w, mask.h);
+  const seed = opts.seed ?? 1;
+  const cluster = opts.cluster ?? 0;
+  const bias = opts.bias ?? 0;
+  mask.forEachFilled((x, y) => {
+    const nx = Math.max(-1, Math.min(1, (x + 0.5 - cx) / rx));
+    const ny = Math.max(-1, Math.min(1, (y + 0.5 - cy) / ry));
+    const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+    const l = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+    let t = 0.5 + l * 0.5 + bias;
+    if (cluster > 0) {
+      // Staggered 2x2 cells so the texture never lines up on a grid.
+      const cxl = Math.floor((x + (Math.floor(y / 2) % 2)) / 2);
+      const cyl = Math.floor(y / 2);
+      t += (hash2(cxl, cyl, seed) - 0.5) * cluster;
+    }
+    out.set(x, y, ramp[clampIndex(Math.floor(t * ramp.length), ramp.length)]);
+  });
+  return out;
+}
+
+/** Recolour pixels of one colour that sit on the lower or right rim of the silhouette. */
+export function rimDarken(g: PixelGrid, from: ColorName | null, to: ColorName): PixelGrid {
+  const out = g.clone();
+  g.forEachFilled((x, y, c) => {
+    if (from && c !== from) return;
+    if (!g.filled(x, y + 1) || !g.filled(x + 1, y)) out.set(x, y, to);
+  });
+  return out;
 }
 
 // ---------------------------------------------------------------------------

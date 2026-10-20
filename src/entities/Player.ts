@@ -39,7 +39,7 @@ export class Player {
     this.x = x;
     this.y = y;
     this.elevation = map.elevationAtPx(x, y);
-    this.shadow = scene.add.image(x, y, PROP_TEXTURES.shadowS).setAlpha(0.4);
+    this.shadow = scene.add.image(x, y, PROP_TEXTURES.shadowS);
     this.sprite = scene.add.sprite(x, y, texture, charFrame('down', 0)).setOrigin(0.5, 1);
     this.sync();
   }

@@ -19,7 +19,7 @@ const AMBIENCE_REFRESH_MS = 500;
 /** Cells from water at which the pond is inaudible. */
 const WATER_HEARING_CELLS = 7;
 /** Player sprite's visual center sits this far above the feet. */
-const CAMERA_FOCUS_OFFSET_Y = 12;
+const CAMERA_FOCUS_OFFSET_Y = 16;
 
 export class WorldScene extends Phaser.Scene {
   private def!: MapDef;

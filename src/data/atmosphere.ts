@@ -16,16 +16,16 @@ export interface GradeKey {
 
 export const GRADE_KEYS: GradeKey[] = [
   { minute: 360, color: 'lilac', strength: 0.55, darkness: 0.55, glow: 'lilac', glowAlpha: 0.1 }, // 6:00 blue-violet dawn
-  { minute: 420, color: 'peach', strength: 0.35, darkness: 0.15, glow: 'peach', glowAlpha: 0.1 }, // 7:00 warm sunrise
+  { minute: 420, color: 'sand', strength: 0.4, darkness: 0.15, glow: 'dirtLight', glowAlpha: 0.08 }, // 7:00 warm sunrise
   { minute: 540, color: 'cream', strength: 0.04, darkness: 0, glow: 'gold', glowAlpha: 0 }, // 9:00 soft morning
   { minute: 720, color: 'cream', strength: 0, darkness: 0, glow: 'gold', glowAlpha: 0.0 }, // noon
   { minute: 960, color: 'cream', strength: 0.04, darkness: 0, glow: 'gold', glowAlpha: 0 },
-  { minute: 1050, color: 'amber', strength: 0.3, darkness: 0.05, glow: 'amber', glowAlpha: 0.1 }, // 17:30 golden hour
-  { minute: 1140, color: 'coral', strength: 0.45, darkness: 0.3, glow: 'coral', glowAlpha: 0.14 }, // 19:00 sunset
+  { minute: 1050, color: 'dirtHi', strength: 0.3, darkness: 0.05, glow: 'dirtLight', glowAlpha: 0.08 }, // 17:30 golden hour
+  { minute: 1140, color: 'peach', strength: 0.36, darkness: 0.3, glow: 'amber', glowAlpha: 0.08 }, // 19:00 sunset
   { minute: 1200, color: 'violet', strength: 0.55, darkness: 0.65, glow: 'violet', glowAlpha: 0.08 }, // 20:00 dusk
-  { minute: 1260, color: 'sea', strength: 0.72, darkness: 0.9, glow: 'sea', glowAlpha: 0.04 }, // 21:00 night
-  { minute: 1380, color: 'deep', strength: 0.7, darkness: 1, glow: 'deep', glowAlpha: 0.03 },
-  { minute: 1560, color: 'deep', strength: 0.76, darkness: 1, glow: 'deep', glowAlpha: 0.03 }, // 2:00
+  { minute: 1260, color: 'violet', strength: 0.66, darkness: 0.9, glow: 'deep', glowAlpha: 0.07 }, // 21:00 night
+  { minute: 1380, color: 'violet', strength: 0.72, darkness: 1, glow: 'deep', glowAlpha: 0.07 },
+  { minute: 1560, color: 'violet', strength: 0.76, darkness: 1, glow: 'deep', glowAlpha: 0.06 }, // 2:00
 ];
 
 /** Time-of-day buckets used for music and ambience. */

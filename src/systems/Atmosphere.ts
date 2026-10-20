@@ -18,6 +18,13 @@ interface Leaf {
   color: number;
 }
 
+interface Puff {
+  s: Phaser.GameObjects.Sprite;
+  vx: number;
+  life: number;
+  max: number;
+}
+
 interface Firefly {
   s: Phaser.GameObjects.Image;
   ox: number;
@@ -40,6 +47,8 @@ export class Atmosphere {
   private readonly vignette: Phaser.GameObjects.Image;
   private leaves: Leaf[] = [];
   private flies: Firefly[] = [];
+  private puffs: Puff[] = [];
+  private nextPuff = 0;
   private nextLeaf = 0;
   private nextFly = 0;
   darkness = 0;
@@ -107,6 +116,32 @@ export class Atmosphere {
 
     this.updateLeaves(timeMs, deltaMs);
     this.updateFireflies(timeMs, deltaMs);
+    this.updateSmoke(timeMs, deltaMs);
+  }
+
+  /** Chimney smoke: puffs grow, drift right with the breeze, and fade. */
+  private updateSmoke(timeMs: number, deltaMs: number): void {
+    const dt = deltaMs / 1000;
+    if (timeMs > this.nextPuff && this.puffs.length < ATMOSPHERE.smokeMaxAlive) {
+      this.nextPuff = timeMs + ATMOSPHERE.smokeEveryMs * (0.7 + Math.random() * 0.6);
+      for (const c of this.rendered.chimneys) {
+        const s = this.scene.add.sprite(c.x, c.y, FX_TEXTURES.smoke, 0).setDepth(DEPTH.grade - 1);
+        this.puffs.push({ s, vx: 3 + Math.random() * 3, life: 0, max: 3.2 + Math.random() * 1.2 });
+      }
+    }
+    this.puffs = this.puffs.filter((p) => {
+      p.life += dt;
+      const t = p.life / p.max;
+      p.s.x += (p.vx + Math.sin(p.life * 1.7) * 2) * dt;
+      p.s.y -= 9 * dt;
+      p.s.setFrame(t < 0.25 ? 0 : t < 0.6 ? 1 : 2);
+      p.s.setAlpha(Math.max(0, Math.min(0.85, (1 - t) * 1.4)));
+      if (p.life >= p.max) {
+        p.s.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   private view(): Phaser.Geom.Rectangle {
