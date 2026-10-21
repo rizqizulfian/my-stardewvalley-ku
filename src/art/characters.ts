@@ -28,12 +28,13 @@ export interface CharacterLook {
   hat?: { style: 'caping' | 'peci' | 'hijab'; ramp: readonly [ColorName, ColorName, ColorName, ColorName] };
 }
 
-/** Frame layout of every character sheet: per facing, 2 idle, 4 walk, then 2 tool-use poses (wind-up, strike). */
+/** Frame layout of every character sheet: per facing, 2 idle, 4 walk, 2 tool-use poses (wind-up, strike), then sitting. */
 export const CHAR_FRAMES = {
-  perFacing: 8,
+  perFacing: 9,
   idle: [0, 1],
   walk: [2, 3, 4, 5],
   use: [6, 7],
+  sit: 8,
 } as const;
 
 export function charFrame(facing: Facing, n: number): number {
@@ -171,6 +172,14 @@ const SIDE_LEGS = {
     '................',
   ],
 };
+
+/** Seated legs, drawn under a torso lowered by SIT_DROP rows. */
+const SIT_LEGS: Record<View, string[]> = {
+  down: ['....prrrrrqp....', '....prqpprqp....', '....xyyxxyyx....', '....xxxxxxxx....'],
+  up: ['....prrrrrqp....', '....pqqqqqqp....', '................', '................'],
+  side: ['.....prrrrrrqp..', '.....pqqqqqqrp..', '..........pqp...', '..........xyyx..'],
+};
+const SIT_DROP = 3;
 
 // Overlays: hats and hairstyles, per facing. Drawn after the head.
 const CAPING = [
@@ -360,6 +369,13 @@ function compose(upper: PixelGrid, lower: PixelGrid, bob: number): PixelGrid {
   return g;
 }
 
+function seated(upper: PixelGrid, view: View, legend: Legend): PixelGrid {
+  const g = new PixelGrid(PLAYER.frameWidth, PLAYER.frameHeight);
+  g.stamp(PixelGrid.fromRows(SIT_LEGS[view], legend, `legs-${view}-sit`), 0, UPPER_ROWS + SIT_DROP);
+  g.stamp(upper, 0, SIT_DROP);
+  return g;
+}
+
 /** All frames for one character, in CHAR_FRAMES order for each facing. */
 export function buildCharacterFrames(look: CharacterLook): PixelGrid[] {
   const legend = legendFor(look);
@@ -376,6 +392,7 @@ export function buildCharacterFrames(look: CharacterLook): PixelGrid[] {
       compose(up, legs(view, 'idle', legend), 0),
       compose(armless(up, view, legend), legs(view, 'idle', legend), 0),
       compose(armless(up, view, legend), legs(view, 'idle', legend), 1),
+      seated(up, view, legend),
     ];
     frames.push(...(facing === 'left' ? set.map((f) => f.flipX()) : set));
   }

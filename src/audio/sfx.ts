@@ -183,6 +183,41 @@ export const SFX: Record<string, SfxFn> = {
     burst(ctx, d, t + 0.04, { type: 'bandpass', freq: 700 * p, q: 6, dur: 0.22, gain: 0.05, attack: 0.05, sweepTo: 520 * p });
     thump(ctx, d, t + 0.2, 140 * p, 90 * p, 0.1, 0.1, 'triangle');
   },
+  eat: (ctx, d, t, p) => {
+    // Two soft crunchy bites.
+    for (const dt of [0, 0.16]) {
+      burst(ctx, d, t + dt, { type: 'bandpass', freq: 1700 * p, q: 1.2, dur: 0.07, gain: 0.07 });
+      thump(ctx, d, t + dt, 180 * p, 120 * p, 0.06, 0.05);
+    }
+  },
+  drink: (ctx, d, t, p) => {
+    // Gulps: little rising bubbles.
+    for (const [dt, hz] of [
+      [0, 420],
+      [0.17, 480],
+      [0.34, 440],
+    ])
+      thump(ctx, d, t + dt, hz * p, hz * 1.6 * p, 0.08, 0.07);
+  },
+  coin: (ctx, d, t, p) => {
+    tone(ctx, d, t, 1320 * p, 0.09, 0.05, 'triangle');
+    tone(ctx, d, t + 0.07, 1760 * p, 0.2, 0.05, 'triangle');
+  },
+  ship: (ctx, d, t, p) => {
+    thump(ctx, d, t, 150 * p, 100 * p, 0.12, 0.12, 'triangle');
+    burst(ctx, d, t, { type: 'lowpass', freq: 900 * p, q: 1, dur: 0.1, gain: 0.06 });
+    tone(ctx, d, t + 0.12, 990 * p, 0.15, 0.035, 'triangle');
+  },
+  talk: (ctx, d, t, p) => {
+    tone(ctx, d, t, 520 * p * (0.92 + Math.random() * 0.16), 0.05, 0.05, 'triangle');
+  },
+  sit: (ctx, d, t, p) => {
+    thump(ctx, d, t, 130 * p, 95 * p, 0.09, 0.08, 'triangle');
+  },
+  sleep: (ctx, d, t, p) => {
+    // A slow falling three-note lullaby.
+    [784, 659, 523].forEach((hz, i) => tone(ctx, d, t + i * 0.32, hz * p, 0.6, 0.045, 'sine'));
+  },
   whoosh: (ctx, d, t, p) => {
     burst(ctx, d, t, { type: 'bandpass', freq: 500 * p, q: 0.7, dur: 0.3, gain: 0.06, attack: 0.12, sweepTo: 1200 * p });
   },

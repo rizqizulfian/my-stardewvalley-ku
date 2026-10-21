@@ -1,7 +1,7 @@
-// Plain-data game state. Everything here is serialisable so it can be saved
-// to localStorage as-is in the save/load phase.
+// Plain-data game state. Everything here is serialisable and is saved to
+// localStorage as-is (see save.ts).
 
-import { FARM, TIME } from '../config';
+import { FARM, NEEDS, TIME } from '../config';
 import { STARTING_ITEMS } from '../data/items';
 import { START_MAP } from '../data/maps';
 
@@ -45,7 +45,21 @@ export interface GameState {
   soil: Record<string, Record<number, SoilState>>;
   /** Props cleared per map (anchor cell indices). */
   removed: Record<string, number[]>;
+  /** Body needs, 0..100 (see NEEDS in config). */
+  needs: Needs;
+  /** Items in the shipping box, sold overnight. */
+  shipped: ItemStack[];
 }
+
+export interface Needs {
+  energy: number;
+  hunger: number;
+  thirst: number;
+  /** Alertness: 100 just after waking, falls through the day. */
+  sleep: number;
+}
+
+export type NeedId = keyof Needs;
 
 export function newGameState(): GameState {
   const inventory: Array<ItemStack | null> = new Array(FARM.inventorySlots).fill(null);
@@ -62,6 +76,8 @@ export function newGameState(): GameState {
     water: FARM.canCapacity,
     soil: {},
     removed: {},
+    needs: { energy: NEEDS.max, hunger: 85, thirst: 80, sleep: NEEDS.max },
+    shipped: [],
   };
 }
 

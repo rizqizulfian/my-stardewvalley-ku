@@ -34,7 +34,8 @@ export const HOUSE_MAP: MapDef = {
     '-j----m-----o-',
     '--------------',
   ],
-  spawn: { x: 6, y: 10 },
+  // Beside the bed: where you wake up (and where a loaded save starts).
+  spawn: { x: 3, y: 5 },
   seed: 3,
   decor: { flowers: 0, tufts: 0, pebbles: 0, meadow: 0, reeds: 0, lilies: 0 },
   music: { morning: 'home', day: 'home', evening: 'home', night: 'home' },

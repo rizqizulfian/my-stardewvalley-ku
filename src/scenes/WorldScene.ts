@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { DEBUG, PLAYER, RENDER, TIME } from '../config';
+import { DEBUG, NEEDS, PLAYER, RENDER, TIME } from '../config';
 import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
 import { PLAYER_CHARACTER } from '../data/characters';
 import type { Facing } from '../art/characters';
 import { MAPS } from '../data/maps';
+import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
 import { Player } from '../entities/Player';
 import { Atmosphere } from '../systems/Atmosphere';
@@ -13,12 +14,17 @@ import { EV, bus } from '../systems/events';
 import { soilOf } from '../systems/farming';
 import { FarmView } from '../systems/FarmView';
 import { state } from '../systems/GameState';
-import { addItem, selectSlot } from '../systems/Inventory';
+import { endDay } from '../systems/day';
+import { addItem, itemDef, selectSlot, selectedStack } from '../systems/Inventory';
+import { addNeed, walkFactor } from '../systems/needs';
+import { saveGame } from '../systems/save';
+import { canShip, shipSlot } from '../systems/shipping';
 import { renderMap, type RenderedMap } from '../systems/MapRenderer';
-import { TimeSystem, timeOfDay } from '../systems/TimeSystem';
+import { TimeSystem, formatClock, timeOfDay } from '../systems/TimeSystem';
 import { ToolController } from '../systems/ToolController';
 import { overHud, uiState } from '../systems/uiState';
-import { WorldMap } from '../systems/WorldMap';
+import { WorldMap, type PlacedProp } from '../systems/WorldMap';
+import type { DialogRequest } from '../ui/DialogBox';
 
 const T = RENDER.tileSize;
 /** How often ambience levels are refreshed (ms). */
@@ -37,6 +43,15 @@ const FADE_OUT_MS = 220;
 const FADE_IN_MS = 280;
 /** How far ahead of the feet (px) a step is checked against exits. */
 const WARP_PROBE = 3;
+
+/** Seated, the sprite sits this many px above the feet point so the bench sorts behind the legs. */
+const SEAT_LIFT = 7;
+const SLEEP_FADE_MS = 900;
+const PASS_OUT_FADE_MS = 400;
+
+function dialog(req: DialogRequest): void {
+  bus.emit(EV.dialog, req);
+}
 
 /** Where the player appears after a map change (set just before the scene restarts). */
 let arrival: { x: number; y: number; face: Facing } | null = null;
@@ -104,7 +119,7 @@ export class WorldScene extends Phaser.Scene {
       }),
     );
     this.keys[DEBUG.nextDayKey].on('down', () => {
-      if (this.started && !uiState.menuOpen) this.time2.nextDay();
+      if (this.started && !uiState.menuOpen) this.sleep(false);
     });
     const interact = () => {
       if (this.started && !uiState.menuOpen) this.tools.interact();
@@ -123,10 +138,20 @@ export class WorldScene extends Phaser.Scene {
       selectSlot(state, state.selected + Math.sign(dy));
       audio.playSfx('select', 0.6);
     });
+    this.tools.onUseProp = (p) => this.useProp(p);
     const onFarm = () => this.farm.refresh();
+    const onPassOut = () => this.sleep(true);
+    // Resting on a bench brings energy back minute by minute.
+    const onMinute = () => {
+      if (this.player.seated) addNeed(state, 'energy', NEEDS.benchEnergy);
+    };
     bus.on(EV.farmChanged, onFarm);
+    bus.on(EV.passOut, onPassOut);
+    bus.on(EV.minute, onMinute);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off(EV.farmChanged, onFarm);
+      bus.off(EV.passOut, onPassOut);
+      bus.off(EV.minute, onMinute);
       bus.off(EV.started, this.onStarted, this);
       // Keys and pointer handlers belong to this map; the scene restarts on every map change.
       this.input.keyboard?.removeAllKeys(true);
@@ -181,6 +206,129 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // Things the action button can use
+
+  private useProp(p: PlacedProp): boolean {
+    const use = p.def.use;
+    if (!use) return false;
+    if (use.startsWith('shop:')) return this.openShop(use.slice(5));
+    switch (use) {
+      case 'bed':
+        dialog({
+          pages: [state.minute < 18 * 60 ? 'Go to bed already? The day will end.' : 'Go to sleep for the night?'],
+          choices: ['Sleep', 'Not yet'],
+          onChoose: (i) => i === 0 && this.sleep(false),
+        });
+        return true;
+      case 'bench':
+        this.sit(p);
+        return true;
+      case 'well':
+        return this.drinkFromWell(p);
+      case 'ship':
+        return this.ship(p);
+      case 'mailbox':
+        dialog({ pages: ['No letters today.'] });
+        return true;
+      case 'sign':
+        dialog({ pages: [this.def.sign ?? 'The sign is too weathered to read.'] });
+        return true;
+      case 'board':
+        dialog({ pages: this.def.board ?? ['Nothing pinned up today.'] });
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private openShop(id: string): boolean {
+    const shop = SHOPS[id];
+    if (!shop) return false;
+    if (state.minute < shop.open || state.minute >= shop.close) {
+      audio.playSfx('bonk', 0.5);
+      bus.emit(EV.notice, `${shop.name} is closed. Open ${formatClock(shop.open)} - ${formatClock(shop.close)}.`);
+      return true;
+    }
+    bus.emit(EV.shop, id);
+    return true;
+  }
+
+  private drinkFromWell(p: PlacedProp): boolean {
+    const [x, y] = this.propCenter(p);
+    this.player.face(x, y);
+    return this.player.act({
+      tool: null,
+      frames: [160, 300],
+      impact: 0,
+      onImpact: () => {
+        addNeed(state, 'thirst', NEEDS.max);
+        audio.playSfx('drink', 0.9);
+        this.fx.burst('drop', x, y, { count: 5, spread: 20, up: 40 });
+        bus.emit(EV.notice, 'Fresh, cool water. Thirst restored.');
+      },
+    });
+  }
+
+  private ship(p: PlacedProp): boolean {
+    const st = selectedStack(state);
+    if (st && canShip(st.id)) {
+      const name = itemDef(st.id).name;
+      const sent = shipSlot(state, state.selected);
+      if (!sent) return false;
+      audio.playSfx('ship', 0.9);
+      this.rendered.shakeProp(p, 1);
+      bus.emit(EV.notice, `Shipped ${sent.qty} ${name}. Sold overnight.`);
+      return true;
+    }
+    const inBox = state.shipped.map((l) => `${l.qty} ${itemDef(l.id).name}`).join(', ');
+    const worth = state.shipped.reduce((n, l) => n + l.qty * itemDef(l.id).price, 0);
+    dialog({
+      pages: [
+        'Shipping box. Hold a crop or item and press X (or right-click) here to put it in. Everything sells overnight at full price.',
+        ...(inBox ? [`In the box: ${inBox}. Worth ${worth}g.`] : []),
+      ],
+    });
+    return true;
+  }
+
+  private propCenter(p: PlacedProp): [number, number] {
+    return [p.cx * T + (p.def.footprint.w * T) / 2, (p.cy + 1) * T - T / 2];
+  }
+
+  private sit(p: PlacedProp): void {
+    const x = p.cx * T + (p.def.footprint.w * T) / 2;
+    this.player.sit(x, (p.cy + 1) * T + 1, SEAT_LIFT, 'down');
+    audio.playSfx('sit', 0.8);
+    bus.emit(EV.notice, 'Resting. Energy comes back slowly. Walk to get up.');
+  }
+
+  private standUp(): void {
+    this.player.stand(this.player.x, this.player.y + T - 3);
+  }
+
+  /** Bed (or collapse at 2:00): fade out, end the day, save, show the summary, wake up at home. */
+  private sleep(passedOut: boolean): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    this.tools.enabled = false;
+    if (this.player.seated) this.standUp();
+    if (passedOut) bus.emit(EV.notice, "It's 2:00 am... you collapse from exhaustion.");
+    audio.playSfx(passedOut ? 'bonk' : 'sleep', 0.8);
+    this.cameras.main.fadeOut(passedOut ? PASS_OUT_FADE_MS : SLEEP_FADE_MS, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      const summary = endDay(state, passedOut);
+      const home = MAPS.house;
+      state.mapId = home.id;
+      arrival = { x: home.spawn.x, y: home.spawn.y, face: 'left' };
+      saveGame(state);
+      bus.emit(EV.newDay, state.day);
+      bus.emit(EV.farmChanged);
+      bus.once(EV.dayDone, () => this.scene.restart());
+      bus.emit(EV.daySummary, summary);
+    });
+  }
+
   private onPeriod(): void {
     audio.playMusic(this.def.music[timeOfDay(state.minute)]);
   }
@@ -193,10 +341,12 @@ export class WorldScene extends Phaser.Scene {
       this.time2.update(delta, ff);
       const dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       const dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+      if (this.player.seated && (dx || dy)) this.standUp();
+      this.player.speedFactor = walkFactor(state);
       const wasMoving = this.player.isMoving;
       this.player.update(delta, { dx, dy });
       if (!wasMoving && this.player.isMoving) this.player.resetAnim();
-      if (dx || dy) {
+      if ((dx || dy) && !this.player.seated) {
         const w = this.warpAt(dx, dy);
         if (w) this.warp(w);
       }
@@ -207,10 +357,11 @@ export class WorldScene extends Phaser.Scene {
     // Aim, then keep swinging while the use button is held.
     const p = this.input.activePointer;
     const pointerOk = active && !overHud(p.x, p.y);
-    this.tools.enabled = active;
+    const handsFree = active && !this.player.seated && time > uiState.blockUntil;
+    this.tools.enabled = handsFree;
     this.tools.aim(pointerOk && this.pointerInside(p) ? p : null);
     this.tools.updateCursor();
-    if (active && !this.player.busy) {
+    if (handsFree && !this.player.busy) {
       if (k.SPACE.isDown || k.C.isDown || (p.leftButtonDown() && pointerOk)) this.tools.use();
     }
     this.fx.update(delta, this.player.x, this.player.y);

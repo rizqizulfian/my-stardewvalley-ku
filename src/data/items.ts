@@ -2,7 +2,17 @@
 // by icon name (see art/items.ts).
 
 export type ToolKind = 'hoe' | 'can' | 'axe' | 'pickaxe' | 'scythe';
-export type ItemKind = 'tool' | 'seed' | 'produce' | 'resource';
+export type ItemKind = 'tool' | 'seed' | 'produce' | 'resource' | 'food';
+
+/** What eating or drinking one restores (need points, 0..100 scale; sleep is alertness). */
+export interface FoodEffect {
+  hunger?: number;
+  thirst?: number;
+  energy?: number;
+  sleep?: number;
+  /** Drinks play a sip instead of a bite. */
+  drink?: boolean;
+}
 
 export interface ItemDef {
   id: string;
@@ -12,11 +22,13 @@ export interface ItemDef {
   icon: string;
   /** Largest stack in one slot. Tools never stack. */
   stack: number;
-  /** Sell price in gold (used by the shipping box later). */
+  /** Value in gold: produce sells for this; shops charge this. */
   price: number;
   tool?: ToolKind;
   /** Crop id planted by this seed. */
   crop?: string;
+  /** Edible: what one portion restores. */
+  food?: FoodEffect;
 }
 
 const STACK = 99;
@@ -45,6 +57,19 @@ export const ITEMS: Record<string, ItemDef> = {
   mawar: { id: 'mawar', name: 'Rose', kind: 'produce', icon: 'mawar', stack: STACK, price: 70 },
   melati: { id: 'melati', name: 'Jasmine', kind: 'produce', icon: 'melati', stack: STACK, price: 55 },
 
+  // Warung food and drink. Prices are what shops charge; selling gets half (see SHOPS.sellRatio).
+  nasiGoreng: { id: 'nasiGoreng', name: 'Fried Rice', kind: 'food', icon: 'nasiGoreng', stack: 20, price: 60, food: { hunger: 60, energy: 25 } },
+  soto: { id: 'soto', name: 'Chicken Soto', kind: 'food', icon: 'soto', stack: 20, price: 50, food: { hunger: 45, thirst: 20, energy: 20 } },
+  pisangGoreng: { id: 'pisangGoreng', name: 'Fried Banana', kind: 'food', icon: 'pisangGoreng', stack: 20, price: 20, food: { hunger: 25, energy: 12 } },
+  esTeh: { id: 'esTeh', name: 'Iced Tea', kind: 'food', icon: 'esTeh', stack: 20, price: 15, food: { thirst: 60, energy: 5, drink: true } },
+  kopi: { id: 'kopi', name: 'Coffee', kind: 'food', icon: 'kopi', stack: 20, price: 25, food: { sleep: 45, thirst: 10, energy: 10, drink: true } },
+  kelapa: { id: 'kelapa', name: 'Young Coconut', kind: 'food', icon: 'kelapa', stack: 20, price: 35, food: { thirst: 80, energy: 10, drink: true } },
+  // Fruit stall.
+  pisang: { id: 'pisang', name: 'Banana', kind: 'food', icon: 'pisang', stack: STACK, price: 15, food: { hunger: 20, energy: 8 } },
+  mangga: { id: 'mangga', name: 'Mango', kind: 'food', icon: 'mangga', stack: STACK, price: 25, food: { hunger: 20, thirst: 20, energy: 5 } },
+  jeruk: { id: 'jeruk', name: 'Orange', kind: 'food', icon: 'jeruk', stack: STACK, price: 20, food: { thirst: 30, hunger: 10, energy: 5 } },
+  semangka: { id: 'semangka', name: 'Watermelon', kind: 'food', icon: 'semangka', stack: STACK, price: 20, food: { thirst: 45, energy: 5 } },
+
   wood: { id: 'wood', name: 'Wood', kind: 'resource', icon: 'wood', stack: STACK, price: 2 },
   stone: { id: 'stone', name: 'Stone', kind: 'resource', icon: 'stone', stack: STACK, price: 2 },
   fiber: { id: 'fiber', name: 'Fiber', kind: 'resource', icon: 'fiber', stack: STACK, price: 1 },
@@ -65,4 +90,6 @@ export const STARTING_ITEMS: Array<[string, number]> = [
   ['seedMatahari', 5],
   ['seedMawar', 5],
   ['seedMelati', 5],
+  ['pisang', 3],
+  ['esTeh', 1],
 ];

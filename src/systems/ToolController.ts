@@ -6,7 +6,8 @@ import Phaser from 'phaser';
 import { DEPTH, FARM, PLAYER, RENDER, TOOL_TIMING } from '../config';
 import { ITEM_TEXTURES } from '../art/items';
 import { audio } from '../audio/AudioManager';
-import { CROPS } from '../data/crops';
+import { SEASONS } from '../config';
+import { CROPS, inSeason } from '../data/crops';
 import type { ToolKind } from '../data/items';
 import { TERRAIN, isWaterTerrain } from '../data/terrain';
 import type { ActionSpec, Player } from '../entities/Player';
@@ -16,6 +17,7 @@ import { harvest, isRipe, plant, soilOf, till, water } from './farming';
 import type { FarmView } from './FarmView';
 import type { GameState } from './GameState';
 import { itemDef, selectedStack, takeFromSlot } from './Inventory';
+import { consume, spendToolEnergy } from './needs';
 import type { RenderedMap } from './MapRenderer';
 import type { PlacedProp, WorldMap } from './WorldMap';
 
@@ -32,6 +34,8 @@ export class ToolController {
   private target: Target = { cx: 0, cy: 0 };
   private mouseAim = false;
   enabled = true;
+  /** The action button on a usable prop (bed, bench, shop...). Returns true if handled. */
+  onUseProp: (p: PlacedProp) => boolean = () => false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -112,7 +116,7 @@ export class ToolController {
       case 'hoe':
         return (this.map.canTill(cx, cy) && !soil) || !!prop?.def.breakable?.tools.includes('hoe');
       case 'can':
-        return this.isWater(cx, cy) || (!!soil && !soil.wet && this.state.water > 0);
+        return this.isWater(cx, cy) || prop?.def.use === 'well' || (!!soil && !soil.wet && this.state.water > 0);
       case 'axe':
         return !!prop && (!!prop.def.breakable?.tools.includes('axe') || !!prop.def.shakes);
       case 'pickaxe':
@@ -135,11 +139,12 @@ export class ToolController {
     if (!st) return false;
     const def = itemDef(st.id);
     if (def.kind === 'seed' && def.crop) return this.plantAt(cx, cy, def.crop);
+    if (def.food) return this.eat();
     if (def.kind !== 'tool' || !def.tool) return false;
     return this.swing(def.tool, cx, cy);
   }
 
-  /** The action button: pick a ripe crop (more uses come with later systems). */
+  /** The action button: pick a ripe crop, or use the prop in front (bed, bench, shop...). */
   interact(): boolean {
     if (!this.enabled || this.player.busy) return false;
     const { cx, cy } = this.target;
@@ -147,7 +152,36 @@ export class ToolController {
       if (this.mouseAim) this.player.face(cx * T + T / 2, cy * T + T / 2);
       return this.harvestAt(cx, cy);
     }
+    const p = this.usablePropAt(cx, cy) ?? this.usablePropAt(this.facingCell().cx, this.facingCell().cy);
+    if (p) return this.onUseProp(p);
+    // Holding food: the action button eats it too.
+    if (selectedStack(this.state) && itemDef(selectedStack(this.state)!.id).food) return this.eat();
     return false;
+  }
+
+  private usablePropAt(cx: number, cy: number): PlacedProp | null {
+    if (!this.map.inBounds(cx, cy)) return null;
+    const p = this.map.propAt(cx, cy);
+    return p?.def.use ? p : null;
+  }
+
+  /** Eat or drink one of the selected item. */
+  private eat(): boolean {
+    const st = selectedStack(this.state);
+    const food = st ? itemDef(st.id).food : undefined;
+    if (!st || !food) return false;
+    const slot = this.state.selected;
+    return this.player.act({
+      tool: null,
+      frames: [140, 260],
+      impact: 0,
+      onImpact: () => {
+        if (takeFromSlot(this.state, slot, 1) < 1) return;
+        consume(this.state, food);
+        audio.playSfx(food.drink ? 'drink' : 'eat', 0.9);
+        this.fx.burst('spark', this.player.x, this.player.y - 18, { count: 3, spread: 8, up: 20, z: 4, gravity: 0, life: 600 });
+      },
+    });
   }
 
   get targetCell(): Target {
@@ -184,6 +218,11 @@ export class ToolController {
       audio.playSfx('bonk', 0.5);
       return false;
     }
+    if (!inSeason(CROPS[crop], this.state.season)) {
+      audio.playSfx('bonk', 0.5);
+      bus.emit(EV.notice, `${CROPS[crop].name} won't grow in ${SEASONS[this.state.season]}.`);
+      return false;
+    }
     return this.player.act({
       tool: null,
       frames: [60, 120],
@@ -208,7 +247,12 @@ export class ToolController {
       impact: timing.impact,
       onImpact: () => this.impact(tool, cx, cy),
     };
-    if (!this.player.act(spec)) return false;
+    if (this.player.busy) return false;
+    if (!spendToolEnergy(this.state, tool)) {
+      audio.playSfx('bonk', 0.4);
+      return false;
+    }
+    this.player.act(spec);
     if (tool === 'scythe') audio.playSfx('swish', 0.8);
     else if (tool !== 'can') audio.playSfx('swing', 0.6);
     return true;
@@ -242,7 +286,7 @@ export class ToolController {
         return;
       }
       case 'can': {
-        if (this.isWater(cx, cy)) {
+        if (this.isWater(cx, cy) || this.map.propAt(cx, cy)?.def.use === 'well') {
           this.state.water = FARM.canCapacity;
           bus.emit(EV.inventoryChanged);
           audio.playSfx('refill', 0.9);

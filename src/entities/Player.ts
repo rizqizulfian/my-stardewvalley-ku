@@ -50,6 +50,10 @@ export class Player {
   private frameIndex = 0;
   private action: RunningAction | null = null;
   private readonly tool: Phaser.GameObjects.Sprite;
+  /** While seated the sprite is drawn this many px above the feet point (on the seat). */
+  private seatLift = 0;
+  /** Walking speed factor (needs slow the player down). */
+  speedFactor = 1;
 
   /** Called on each footfall frame with the surface underfoot. */
   onFootstep: (surface: Surface) => void = () => {};
@@ -75,6 +79,33 @@ export class Player {
 
   get busy(): boolean {
     return this.action !== null;
+  }
+
+  get seated(): boolean {
+    return this.seatLift > 0;
+  }
+
+  /** Sit at a feet point (a seat), drawn `lift` px higher so the seat sorts behind the legs. */
+  sit(x: number, y: number, lift: number, facing: Facing = 'down'): void {
+    this.x = x;
+    this.y = y;
+    this.facing = facing;
+    this.seatLift = lift;
+    this.moving = false;
+    this.sprite.setFrame(charFrame(facing, CHAR_FRAMES.sit));
+    this.shadow.setVisible(false);
+    this.sync();
+  }
+
+  /** Stand up at a free spot. */
+  stand(x: number, y: number): void {
+    this.seatLift = 0;
+    this.x = x;
+    this.y = y;
+    this.elevation = this.map.elevationAtPx(x, y - PLAYER.feetHeight / 2);
+    this.shadow.setVisible(true);
+    this.resetAnim();
+    this.sync();
   }
 
   /** Starts a tool swing or gesture. Ignored while another action runs. */
@@ -144,6 +175,10 @@ export class Player {
   }
 
   update(deltaMs: number, input: MoveInput): void {
+    if (this.seatLift) {
+      this.sync();
+      return;
+    }
     if (this.action) {
       this.updateAction(deltaMs);
       this.sync();
@@ -160,7 +195,7 @@ export class Player {
       if (Math.abs(dx) >= Math.abs(dy)) this.facing = dx > 0 ? 'right' : 'left';
       else this.facing = dy > 0 ? 'down' : 'up';
 
-      const step = PLAYER.walkSpeed * dt;
+      const step = PLAYER.walkSpeed * this.speedFactor * dt;
       const nx = this.x + dx * step;
       if (this.map.canOccupy(this.feet(nx, this.y), this.elevation)) this.x = nx;
       const ny = this.y + dy * step;
@@ -175,7 +210,7 @@ export class Player {
   private animate(deltaMs: number): void {
     this.animTime += deltaMs;
     const frames = this.moving ? CHAR_FRAMES.walk : CHAR_FRAMES.idle;
-    const per = this.moving ? PLAYER.walkFrameMs : PLAYER.idleFrameMs;
+    const per = this.moving ? PLAYER.walkFrameMs / this.speedFactor : PLAYER.idleFrameMs;
     if (this.animTime >= per) {
       this.animTime -= per;
       this.frameIndex = (this.frameIndex + 1) % frames.length;
@@ -197,7 +232,7 @@ export class Player {
   }
 
   private sync(): void {
-    this.sprite.setPosition(Math.round(this.x), Math.round(this.y));
+    this.sprite.setPosition(Math.round(this.x), Math.round(this.y) - this.seatLift);
     this.shadow.setPosition(Math.round(this.x), Math.round(this.y) - 1);
     this.sprite.setDepth(worldDepth(this.y));
     this.shadow.setDepth(DEPTH.groundDecor + 0.6);

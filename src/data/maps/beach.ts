@@ -71,6 +71,7 @@ export const BEACH_MAP: MapDef = {
     '----------------------------------------------',
   ],
   spawn: { x: 22, y: 1 },
+  sign: 'Pantai Senja. North: Kampung Padi.',
   seed: 9001,
   decor: { flowers: 0.06, tufts: 0.12, pebbles: 0.02, meadow: 0.2, reeds: 0, lilies: 0 },
   music: { morning: 'beach-day', day: 'beach-day', evening: 'beach-evening', night: 'beach-evening' },

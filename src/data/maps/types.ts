@@ -42,6 +42,10 @@ export interface MapDef {
   interiorStyle?: 'home' | 'shop';
   /** Exits: stepping into the rectangle (cells) moves the player to another map. */
   warps?: WarpDef[];
+  /** What signposts here say. */
+  sign?: string;
+  /** Pages pinned to notice boards here. */
+  board?: string[];
 }
 
 export interface WarpDef {

@@ -61,3 +61,17 @@ footprint; `#` in the prop layer marks cells covered by a bigger prop.
 Maps: Farm, Rumah (house interior), Kampung Padi (village), Pasar Lembah (town), Pantai Senja (beach).
 `warps` in a map def are exit rectangles: walking into one fades out and restarts the World scene on the
 target map at `tx, ty`. Rooms smaller than the view are centred.
+
+## Daily life (Phase 4)
+
+* **Needs** (`systems/needs.ts`, tuning in `NEEDS` in `config.ts`): energy, hunger, thirst and alertness,
+  shown as bars under the clock. Tools cost energy and make you thirsty; time drains hunger, thirst and
+  alertness. Empty needs drain energy and slow walking.
+* **Restore:** eat or drink food from the hotbar (click / Space), drink at a well or the kitchen counter,
+  sit on a bench (X) to rest, sleep in bed.
+* **Day end** (`systems/day.ts`): bed or collapsing at 2:00 am ends the day: shipping box sale, crop growth,
+  calendar and seasons (out-of-season crops wither), then you wake beside the bed and the game saves.
+* **Shops** (`data/shops.ts`): Toko Tani (seeds for the season), Warung Bu Sari (meals and drinks),
+  Kios Buah (fruit). Click to buy (Shift: 5), click your items to sell at half price. Opening hours apply.
+* **Shipping box** by the farmhouse pays full price overnight.
+* **Save** (`systems/save.ts`): localStorage, written each morning. On the title screen Delete starts over.

@@ -1,11 +1,17 @@
 import Phaser from 'phaser';
 import { DEBUG, GAME_TITLE } from '../config';
+import type { DaySummary } from '../systems/day';
 import { audio } from '../audio/AudioManager';
 import { EV, bus } from '../systems/events';
-import { state } from '../systems/GameState';
+import { newGameState, state } from '../systems/GameState';
+import { clearSave, hasSave } from '../systems/save';
 import { selectSlot } from '../systems/Inventory';
 import { uiState } from '../systems/uiState';
 import { ClockPanel } from '../ui/ClockPanel';
+import { DaySummaryView } from '../ui/DaySummary';
+import { DialogBox, type DialogRequest } from '../ui/DialogBox';
+import { NeedsPanel } from '../ui/NeedsPanel';
+import { ShopMenu } from '../ui/ShopMenu';
 import { Hotbar } from '../ui/Hotbar';
 import { InventoryMenu } from '../ui/InventoryMenu';
 import { addPanel } from '../ui/Panel';
@@ -23,7 +29,7 @@ const PROMPT = {
 /** Controls reminder in the top-left; fades after a while, H brings it back. */
 const HELP = {
   lines: [
-    'WASD walk   Click/Space use   X/Right-click pick',
+    'WASD walk   Click/Space use tool or eat   X/Right-click pick, talk, sit, sleep',
     '1-0 or wheel: choose item   E backpack   M mute',
     `hold ${DEBUG.fastForwardKey} fast time   ${DEBUG.nextDayKey} next day   H hide help`,
   ],
@@ -38,8 +44,14 @@ export class UIScene extends Phaser.Scene {
   private toasts!: Toasts;
   private notice!: Notice;
   private help!: PixelText;
+  private needs!: NeedsPanel;
+  private dialog!: DialogBox;
+  private shop!: ShopMenu;
+  private summary!: DaySummaryView;
   private prompt: Phaser.GameObjects.Container | null = null;
   private started = false;
+  /** Released after the start prompt is gone, so the key that starts the game is not read twice. */
+  private wasModal = false;
 
   constructor() {
     super('UI');
@@ -50,7 +62,14 @@ export class UIScene extends Phaser.Scene {
     this.clock.update(state);
     bus.on(EV.minute, () => this.clock.update(state), this);
     bus.on(EV.newDay, () => this.clock.update(state), this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off(EV.minute, undefined, this));
+    bus.on(EV.goldChanged, () => this.clock.update(state), this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      bus.off(EV.minute, undefined, this);
+      bus.off(EV.newDay, undefined, this);
+      bus.off(EV.goldChanged, undefined, this);
+    });
+    this.needs = new NeedsPanel(this);
+    this.needs.setVisible(false);
 
     this.help = new PixelText(this, 4, 4, HELP.lines.join('\n'), { color: 'cream', outline: 'night' }).setAlpha(0.9).setVisible(false);
 
@@ -63,35 +82,71 @@ export class UIScene extends Phaser.Scene {
     this.toasts = new Toasts(this);
     this.notice = new Notice(this);
     this.menu = new InventoryMenu(this, state);
+    this.shop = new ShopMenu(this, state);
+    this.dialog = new DialogBox(this);
+    this.summary = new DaySummaryView(this);
     const refreshInv = () => {
       this.hotbar.refresh(state);
       this.menu.refresh();
+      this.shop.refresh();
     };
     refreshInv();
     const onGained = (id: string, qty: number) => this.toasts.item(id, qty);
     const onNotice = (msg: string) => this.notice.show(msg);
+    const onDialog = (req: DialogRequest) => {
+      this.dialog.open(req);
+      this.syncModal();
+    };
+    const onShop = (id: string) => {
+      this.shop.open(id);
+      this.syncModal();
+    };
+    const onSummary = (s: DaySummary) => {
+      this.summary.show(s, () => {
+        this.syncModal();
+        bus.emit(EV.dayDone);
+      });
+      this.syncModal();
+    };
     bus.on(EV.inventoryChanged, refreshInv);
+    bus.on(EV.goldChanged, refreshInv);
     bus.on(EV.itemGained, onGained);
     bus.on(EV.notice, onNotice);
+    bus.on(EV.dialog, onDialog);
+    bus.on(EV.shop, onShop);
+    bus.on(EV.daySummary, onSummary);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off(EV.inventoryChanged, refreshInv);
+      bus.off(EV.goldChanged, refreshInv);
       bus.off(EV.itemGained, onGained);
       bus.off(EV.notice, onNotice);
+      bus.off(EV.dialog, onDialog);
+      bus.off(EV.shop, onShop);
+      bus.off(EV.daySummary, onSummary);
     });
 
     const kb = this.input.keyboard!;
     const toggleMenu = () => {
-      if (!this.started) return;
-      if (this.menu.isOpen) this.menu.close();
+      if (!this.started || this.dialog.isOpen || this.summary.isOpen) return;
+      if (this.shop.isOpen) this.shop.close();
+      else if (this.menu.isOpen) this.menu.close();
       else this.menu.open();
-      uiState.menuOpen = this.menu.isOpen;
-      this.hotbar.setVisible(!this.menu.isOpen);
-      bus.emit(EV.menu, this.menu.isOpen);
+      this.syncModal();
     };
     kb.on('keydown-E', toggleMenu);
     kb.on('keydown-I', toggleMenu);
     kb.on('keydown-ESC', () => {
-      if (this.menu.isOpen) toggleMenu();
+      if (this.dialog.isOpen) this.dialog.close(-1);
+      else if (this.shop.isOpen) this.shop.close();
+      else if (this.menu.isOpen) this.menu.close();
+      this.syncModal();
+    });
+    // Dialog: advance with Space / Enter / X / F, choose with the arrows or WASD.
+    for (const k of ['SPACE', 'ENTER', 'X', 'F']) kb.on(`keydown-${k}`, () => this.dialog.isOpen && (this.dialog.advance(), this.syncModal()));
+    for (const k of ['LEFT', 'UP', 'A', 'W']) kb.on(`keydown-${k}`, () => this.dialog.move(-1));
+    for (const k of ['RIGHT', 'DOWN', 'D', 'S']) kb.on(`keydown-${k}`, () => this.dialog.move(1));
+    kb.on('keydown', () => {
+      if (this.summary.isOpen) this.summary.finish();
     });
     kb.on('keydown-H', () => {
       if (!this.started) return;
@@ -102,6 +157,10 @@ export class UIScene extends Phaser.Scene {
     this.showStartPrompt();
     const relayout = () => {
       this.clock.layout(this.scale.width);
+      this.needs.layout(this.scale.width);
+      this.dialog.layout(this.scale.width, this.scale.height);
+      this.shop.layout(this.scale.width, this.scale.height);
+      this.summary.layout(this.scale.width, this.scale.height);
       const hb = this.hotbar.layout(this.scale.width, this.scale.height);
       uiState.hudRects = [hb];
       this.notice.layout(this.scale.width, hb.y - 24);
@@ -112,6 +171,29 @@ export class UIScene extends Phaser.Scene {
     relayout();
     this.scale.on(Phaser.Scale.Events.RESIZE, relayout);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, relayout));
+  }
+
+  update(_time: number, delta: number): void {
+    this.dialog.update(delta);
+    this.needs.update(state);
+    // A dialog closed by clicking or by its own choice callbacks.
+    if (this.wasModal && !this.anyModal()) this.syncModal();
+  }
+
+  private anyModal(): boolean {
+    return this.menu.isOpen || this.shop.isOpen || this.dialog.isOpen || this.summary.isOpen;
+  }
+
+  /** One place decides whether the world is paused and which HUD shows. */
+  private syncModal(): void {
+    const modal = this.anyModal();
+    if (this.wasModal && !modal) uiState.blockUntil = this.time.now + 200;
+    this.wasModal = modal;
+    uiState.menuOpen = modal;
+    const fullscreen = this.menu.isOpen || this.shop.isOpen || this.summary.isOpen;
+    this.hotbar.setVisible(this.started && !fullscreen);
+    this.needs.setVisible(this.started && !this.summary.isOpen);
+    bus.emit(EV.menu, modal);
   }
 
   private centerPrompt(box: Phaser.GameObjects.Container): void {
@@ -127,19 +209,25 @@ export class UIScene extends Phaser.Scene {
     title.x = Math.round((PROMPT.width - title.width * PROMPT.titleScale) / 2);
     const sub = new PixelText(this, 0, 32, 'a cozy valley farm', { color: 'clay', shadow: 'mist' });
     sub.x = Math.round((PROMPT.width - sub.width) / 2);
-    const press = new PixelText(this, 0, 45, 'Press any key to start', { color: 'night', shadow: 'mist' });
+    const saved = hasSave();
+    const press = new PixelText(this, 0, 45, saved ? 'Press any key to continue' : 'Press any key to start', { color: 'night', shadow: 'mist' });
     press.x = Math.round((PROMPT.width - press.width) / 2);
     box.add([panel, title, sub, press]);
+    if (saved) {
+      const fresh = new PixelText(this, 0, PROMPT.height + 3, 'Delete: start a new farm', { color: 'cream', outline: 'night' });
+      fresh.x = Math.round((PROMPT.width - fresh.width) / 2);
+      box.add(fresh);
+    }
     const blink = this.time.addEvent({ delay: PROMPT.blinkMs, loop: true, callback: () => press.setVisible(!press.visible) });
 
     const begin = () => {
-      if (this.started) return;
+      if (this.started || this.dialog.isOpen) return;
       this.started = true;
       blink.remove();
       void audio.unlock().then(() => audio.playSfx('start', 0.8));
       uiState.started = true;
       bus.emit(EV.started);
-      this.hotbar.setVisible(true);
+      this.syncModal();
       this.help.setVisible(true);
       this.time.delayedCall(HELP.showMs, () => this.tweens.add({ targets: this.help, alpha: 0, duration: 800, onComplete: () => this.help.setVisible(false) }));
       this.tweens.add({
@@ -152,7 +240,33 @@ export class UIScene extends Phaser.Scene {
         },
       });
     };
-    this.input.keyboard?.once('keydown', begin);
-    this.input.once('pointerdown', begin);
+    const onKey = (e: KeyboardEvent) => {
+      if (this.started) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && hasSave()) {
+        this.dialog.open({
+          pages: ['Start a new farm? This erases your saved game.'],
+          choices: ['Keep my farm', 'Start over'],
+          onChoose: (i) => {
+            if (i !== 1) return;
+            clearSave();
+            Object.assign(state, newGameState());
+            this.scene.get('World').scene.restart();
+            this.clock.update(state);
+            bus.emit(EV.inventoryChanged);
+          },
+        });
+        return;
+      }
+      if (this.dialog.isOpen) return;
+      this.input.keyboard?.off('keydown', onKey);
+      begin();
+    };
+    this.input.keyboard?.on('keydown', onKey);
+    this.input.once('pointerdown', () => {
+      if (!this.dialog.isOpen) {
+        this.input.keyboard?.off('keydown', onKey);
+        begin();
+      }
+    });
   }
 }

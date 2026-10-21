@@ -41,6 +41,16 @@ export const ICON_NAMES = [
   'matahari',
   'mawar',
   'melati',
+  'nasiGoreng',
+  'soto',
+  'esTeh',
+  'kopi',
+  'pisangGoreng',
+  'kelapa',
+  'pisang',
+  'mangga',
+  'jeruk',
+  'semangka',
 ] as const;
 
 export function iconFrame(name: string): number {
@@ -389,6 +399,141 @@ function jasmineIcon(): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
+// ---------------------------------------------------------------------------
+// Food and drink
+
+function steam(g: PixelGrid, x: number, y: number): void {
+  g.set(x, y, 'mist').set(x + 1, y - 1, 'mist').set(x, y - 2, 'mist').set(x + 3, y + 1, 'mist').set(x + 4, y, 'mist').set(x + 3, y - 1, 'mist');
+}
+
+function friedRiceIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.fillEllipse(1, 8, 14, 7, 'haze').fillEllipse(1, 7, 14, 6, 'cream').fillEllipse(3, 8, 10, 4, 'mist');
+  const rice = blobMask(16, 16, [
+    [8, 8, 5, 3],
+    [6, 7, 3, 2],
+  ]);
+  g.stamp(shade(rice, ['umber', 'clay', 'tan', 'sand'], { rim: 0.3, gradient: 0.6, noise: 0.5, seed: 4 }));
+  // Fried egg and cucumber.
+  g.fillEllipse(7, 4, 6, 4, 'cream').fillRect(9, 5, 2, 2, 'gold').set(9, 5, 'cream');
+  g.set(3, 9, 'leaf').set(4, 10, 'lime').set(4, 9, 'grass');
+  g.set(12, 9, 'brick');
+  return outline(g, { steps: 2 });
+}
+
+function sotoIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // Bowl, seen a little from above.
+  g.fillEllipse(1, 6, 14, 9, 'sky').fillRect(1, 9, 14, 2, 'sky');
+  g.fillEllipse(2, 10, 12, 5, 'sea');
+  g.fillEllipse(2, 6, 12, 5, 'amber').fillEllipse(3, 6, 10, 3, 'gold');
+  g.set(5, 7, 'cream').set(6, 7, 'cream').set(9, 8, 'cream').set(10, 7, 'leaf').set(7, 8, 'leaf').set(11, 8, 'umber');
+  g.line(2, 11, 13, 11, 'foam');
+  steam(g, 5, 3);
+  return outline(g, { steps: 2 });
+}
+
+function icedTeaIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.fillRect(4, 3, 8, 12, 'foam').fillRect(5, 3, 6, 11, 'amber');
+  g.fillRect(5, 3, 6, 2, 'gold').fillRect(5, 9, 6, 5, 'clay');
+  g.fillRect(6, 5, 2, 2, 'cream').fillRect(8, 7, 2, 2, 'foam').set(6, 5, 'foam');
+  g.line(10, 0, 9, 6, 'brick').set(10, 0, 'coral');
+  g.fillRect(4, 14, 8, 1, 'sky');
+  return outline(g, { steps: 2 });
+}
+
+function coffeeIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.fillEllipse(1, 12, 14, 4, 'haze').fillEllipse(2, 12, 12, 3, 'mist');
+  g.fillRect(3, 6, 9, 7, 'cream').fillRect(3, 12, 9, 1, 'mist').fillRect(10, 6, 2, 7, 'mist');
+  g.fillEllipse(11, 7, 4, 5, 'cream').fillEllipse(12, 8, 2, 3, null);
+  g.fillRect(4, 6, 7, 2, 'bark').set(5, 6, 'umber');
+  steam(g, 5, 3);
+  return outline(g, { steps: 2 });
+}
+
+function bananaShape(g: PixelGrid, x: number, y: number, ramp: [ColorName, ColorName, ColorName], len = 8): void {
+  // A curved finger: an arc of short vertical strokes.
+  for (let i = 0; i < len; i++) {
+    const t = i / (len - 1);
+    const yy = y + Math.round(Math.sin(t * Math.PI) * -3);
+    g.fillRect(x + i, yy, 1, 3, ramp[1]).set(x + i, yy, ramp[2]).set(x + i, yy + 2, ramp[0]);
+  }
+  g.set(x, y + 1, 'bark').set(x + len - 1, y + 1, 'umber');
+}
+
+function friedBananaIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.fillEllipse(0, 9, 16, 6, 'leaf').fillEllipse(1, 9, 14, 4, 'grass').line(1, 12, 14, 11, 'moss');
+  for (const [x, y] of [
+    [2, 6],
+    [7, 7],
+    [4, 3],
+  ]) {
+    const m = blobMask(16, 16, [[x + 3, y + 2, 3, 2]]);
+    g.stamp(shade(m, ['umber', 'clay', 'amber', 'gold'], { rim: 0.3, gradient: 0.6, noise: 0.6, seed: x * 7 + y }));
+  }
+  return outline(g, { steps: 2 });
+}
+
+function coconutIcon(): PixelGrid {
+  const m = blobMask(16, 16, [[8, 9, 6, 6]]);
+  const g = shade(m, ['pine', 'moss', 'leaf', 'grass'], { rim: 0.3, gradient: 0.65 });
+  g.fillEllipse(4, 3, 8, 4, 'cream').fillEllipse(5, 4, 6, 2, 'mist');
+  g.line(10, 0, 8, 5, 'coral').set(10, 0, 'peach');
+  g.set(5, 8, 'lime');
+  return outline(g, { steps: 2 });
+}
+
+function bananaIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  bananaShape(g, 2, 8, ['amber', 'gold', 'cream'], 11);
+  bananaShape(g, 3, 5, ['amber', 'gold', 'cream'], 10);
+  bananaShape(g, 4, 2, ['clay', 'amber', 'gold'], 9);
+  g.fillRect(1, 7, 2, 4, 'leaf').set(1, 7, 'moss');
+  return outline(g, { steps: 2 });
+}
+
+function mangoIcon(): PixelGrid {
+  const m = blobMask(16, 16, [
+    [8, 9, 6, 5],
+    [6, 8, 4, 4],
+  ]);
+  const g = shade(m, ['clay', 'amber', 'gold', 'cream'], { rim: 0.3, gradient: 0.6 });
+  g.set(11, 10, 'coral').set(12, 9, 'coral').set(11, 11, 'brick').set(12, 11, 'coral');
+  g.line(6, 4, 8, 3, 'umber').fillRect(8, 1, 4, 2, 'leaf').set(11, 1, 'grass').set(9, 1, 'moss');
+  return outline(g, { steps: 2 });
+}
+
+function orangeIcon(): PixelGrid {
+  const m = blobMask(16, 16, [[8, 9, 6, 6]]);
+  const g = shade(m, ['brick', 'coral', 'amber', 'gold'], { rim: 0.3, gradient: 0.6, noise: 0.4, seed: 11 });
+  g.set(8, 4, 'moss').fillRect(9, 2, 4, 2, 'leaf').set(12, 2, 'grass');
+  g.set(6, 7, 'peach');
+  return outline(g, { steps: 2 });
+}
+
+function watermelonIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // A wedge: rind along the bottom arc, flesh above.
+  for (let y = 3; y < 14; y++) {
+    const half = Math.round(((y - 3) / 10) * 7);
+    g.fillRect(8 - half, y, half * 2, 1, 'rose');
+    if (y > 5) g.fillRect(8 - half + 1, y, Math.max(0, half * 2 - 2), 1, 'brick');
+  }
+  g.fillRect(1, 13, 14, 1, 'cream').fillRect(1, 14, 14, 1, 'leaf').fillRect(2, 15, 12, 1, 'moss');
+  for (const [x, y] of [
+    [7, 7],
+    [9, 9],
+    [6, 10],
+    [10, 11],
+    [8, 11],
+  ])
+    g.set(x, y, 'night');
+  return outline(g, { steps: 2 });
+}
+
 function icons(): PixelGrid[] {
   const make: Record<(typeof ICON_NAMES)[number], () => PixelGrid> = {
     hoe: () => toolIcon('hoe'),
@@ -430,6 +575,16 @@ function icons(): PixelGrid[] {
     matahari: sunflowerIcon,
     mawar: roseIcon,
     melati: jasmineIcon,
+    nasiGoreng: friedRiceIcon,
+    soto: sotoIcon,
+    esTeh: icedTeaIcon,
+    kopi: coffeeIcon,
+    pisangGoreng: friedBananaIcon,
+    kelapa: coconutIcon,
+    pisang: bananaIcon,
+    mangga: mangoIcon,
+    jeruk: orangeIcon,
+    semangka: watermelonIcon,
   };
   return ICON_NAMES.map((n) => make[n]());
 }

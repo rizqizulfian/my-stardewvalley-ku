@@ -6,6 +6,8 @@ export const uiState = {
   /** The title prompt has been dismissed. */
   started: false,
   menuOpen: false,
+  /** Scene time (ms) until which world tool use is ignored, so the key that closed a menu does not also swing. */
+  blockUntil: 0,
   hudRects: [] as Array<{ x: number; y: number; w: number; h: number }>,
 };
 

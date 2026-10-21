@@ -33,6 +33,10 @@ export const UI_ICON = {
   winter: 5,
   coin: 6,
   rain: 7,
+  energy: 8,
+  hunger: 9,
+  thirst: 10,
+  sleep: 11,
 } as const;
 
 export const PANEL_SLICE = 8;
@@ -194,7 +198,16 @@ function icons(): PixelGrid[] {
   coin.set(3, 3, 'cream').line(4, 3, 4, 5, 'amber');
   const rain = new PixelGrid(9, 9).fillEllipse(0, 0, 9, 5, 'haze').fillEllipse(1, 0, 6, 3, 'mist');
   rain.set(2, 6, 'sky').set(5, 7, 'sky').set(3, 8, 'sky').set(6, 5, 'sky');
-  return [sun, moon, spring, summer, fall, winter, coin, rain].map((g) => outline(g, { steps: 2 }));
+  // Needs: lightning bolt, rice bowl, water drop, sleepy moon with a "z".
+  const energy = new PixelGrid(9, 9).line(5, 0, 2, 4, 'gold').line(6, 0, 3, 4, 'gold').fillRect(2, 4, 5, 1, 'gold').line(6, 4, 3, 8, 'amber').line(5, 5, 3, 7, 'gold');
+  energy.set(5, 1, 'cream');
+  const hunger = new PixelGrid(9, 9).fillEllipse(0, 2, 9, 4, 'cream').fillEllipse(1, 1, 7, 3, 'mist').fillRect(1, 4, 7, 2, 'brick').fillRect(2, 6, 5, 2, 'brick').fillRect(3, 8, 3, 1, 'wine');
+  hunger.set(2, 4, 'coral').set(3, 1, 'cream');
+  const thirst = new PixelGrid(9, 9).fillEllipse(1, 3, 7, 6, 'sky').line(4, 0, 2, 4, 'sky').line(4, 0, 6, 4, 'sky').fillRect(3, 2, 3, 3, 'sky');
+  thirst.set(3, 5, 'foam').set(3, 4, 'foam').set(6, 7, 'sea').set(5, 8, 'sea');
+  const sleep = new PixelGrid(9, 9).fillEllipse(0, 2, 7, 7, 'lilac').fillEllipse(2, 1, 6, 6, null);
+  sleep.set(1, 5, 'mist').fillRect(5, 0, 4, 1, 'mist').set(7, 1, 'mist').set(6, 2, 'mist').fillRect(5, 3, 4, 1, 'mist');
+  return [sun, moon, spring, summer, fall, winter, coin, rain, energy, hunger, thirst, sleep].map((g) => outline(g, { steps: 2 }));
 }
 
 // ---------------------------------------------------------------------------

@@ -106,7 +106,7 @@ export class Notice {
     this.text.setText(msg).setVisible(true).setAlpha(1);
     this.layout(this.scene.scale.width, this.y);
     this.timer?.remove();
-    this.timer = this.scene.time.delayedCall(2200, () =>
+    this.timer = this.scene.time.delayedCall(1600 + msg.length * 40, () =>
       this.scene.tweens.add({ targets: this.text, alpha: 0, duration: 350, onComplete: () => this.text.setVisible(false) }),
     );
   }

@@ -50,6 +50,48 @@ export const TIME = {
 } as const;
 
 export const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
+
+/**
+ * Body needs, all on a 0..100 scale where 100 is good. Drains are per game
+ * minute; costs are per tool swing. "sleep" is alertness: it falls through the
+ * day and resets in bed.
+ */
+export const NEEDS = {
+  max: 100,
+  drain: { hunger: 0.06, thirst: 0.08, sleep: 0.07 },
+  /** After midnight alertness falls this much faster. */
+  lateSleepMultiplier: 2.5,
+  toolEnergy: { hoe: 2, can: 1, axe: 2, pickaxe: 2, scythe: 1 },
+  /** Hard work makes you thirsty. */
+  toolThirst: 0.4,
+  /** Below this a need counts as low (warning, blinking bar). */
+  low: 25,
+  /** Each empty need (0) drains this much energy per game minute. */
+  emptyEnergyDrain: 0.06,
+  /** Walking speed while exhausted, starving or very sleepy. */
+  slowWalk: 0.75,
+  /** Energy per game minute while sitting on a bench. */
+  benchEnergy: 0.35,
+  /** Waking up: hunger and thirst after a night's sleep. */
+  wakeHunger: -15,
+  wakeThirst: -20,
+  /** Energy after passing out at 2:00 instead of going to bed. */
+  passOutEnergy: 50,
+  passOutSleep: 70,
+  /** Going to bed after midnight costs this much morning energy per hour late. */
+  lateBedEnergyPerHour: 12,
+} as const;
+
+export const SHOPS = {
+  /** Shops pay this share of an item's value. The shipping box pays full price. */
+  sellRatio: 0.5,
+  /** Shift-click buys this many. */
+  bulk: 5,
+} as const;
+
+export const SAVE = {
+  key: 'lembah-padi-save-v1',
+} as const;
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 export const ATMOSPHERE = {

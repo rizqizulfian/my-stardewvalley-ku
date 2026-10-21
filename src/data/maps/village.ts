@@ -71,6 +71,7 @@ export const VILLAGE_MAP: MapDef = {
     'FBBBT--F--BTBTTTBTT------TTFTTBFTYFFTBBYTTBY',
   ],
   spawn: { x: 1, y: 14 },
+  sign: 'West: Lembah Padi Farm.   East: Pasar Lembah (shops, warung, fruit stall).   South: Pantai Senja beach.',
   seed: 4242,
   decor: { flowers: 0.09, tufts: 0.1, pebbles: 0.02, meadow: 0.3, reeds: 0.5, lilies: 0.25 },
   music: { morning: 'village-day', day: 'village-day', evening: 'village-evening', night: 'farm-night' },

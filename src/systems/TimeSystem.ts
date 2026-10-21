@@ -1,10 +1,12 @@
-// Advances the in-game clock and announces minute, period and day changes.
+// Advances the in-game clock, drains needs each minute, and announces minute
+// and period changes. At 2:00 it stops and asks the scene to end the day.
 
-import { SEASONS, TIME, WEEKDAYS } from '../config';
+import { TIME, WEEKDAYS } from '../config';
 import { GRADE_KEYS, TIME_OF_DAY_STARTS, type GradeKey } from '../data/atmosphere';
 import type { TimeOfDay } from '../data/maps/types';
 import { EV, bus } from './events';
 import type { GameState } from './GameState';
+import { tickNeeds } from './needs';
 
 export class TimeSystem {
   private acc = 0;
@@ -26,27 +28,20 @@ export class TimeSystem {
 
   private advanceMinute(): void {
     const s = this.state;
+    if (s.minute >= TIME.dayEndMinute) return;
     s.minute++;
-    if (s.minute >= TIME.dayEndMinute) this.nextDay();
+    tickNeeds(s);
     bus.emit(EV.minute, s.minute);
+    if (s.minute >= TIME.dayEndMinute) {
+      // 2:00: the player collapses wherever they are. The scene takes it from here.
+      bus.emit(EV.passOut);
+      return;
+    }
     const p = timeOfDay(s.minute);
     if (p !== this.lastPeriod) {
       this.lastPeriod = p;
       bus.emit(EV.periodChanged, p);
     }
-  }
-
-  /** Placeholder until sleeping exists: at 2:00 the next day simply begins. */
-  nextDay(): void {
-    const s = this.state;
-    s.minute = TIME.dayStartMinute;
-    s.day++;
-    if (s.day > TIME.daysPerSeason) {
-      s.day = 1;
-      s.season = (s.season + 1) % SEASONS.length;
-      if (s.season === 0) s.year++;
-    }
-    bus.emit(EV.newDay, s.day);
   }
 }
 

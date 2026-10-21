@@ -19,4 +19,15 @@ export const EV = {
   menu: 'ui:menu',
   /** (text) short message near the hotbar. */
   notice: 'ui:notice',
+  /** Energy, hunger, thirst or alertness changed. */
+  needsChanged: 'needs:changed',
+  /** 2:00 came before bed: the scene runs the pass-out sequence. */
+  passOut: 'time:pass-out',
+  /** (DialogRequest) show a text box, optionally with choices. */
+  dialog: 'ui:dialog',
+  /** (shopId) open a shop menu. */
+  shop: 'ui:shop',
+  /** (DaySummary) show the overnight summary; the UI emits dayDone when closed. */
+  daySummary: 'ui:day-summary',
+  dayDone: 'ui:day-done',
 } as const;
