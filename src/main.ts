@@ -4,6 +4,7 @@ import { hex } from './art/palette';
 import { audio } from './audio/AudioManager';
 import { BootScene } from './scenes/BootScene';
 import { IntroScene } from './scenes/IntroScene';
+import { TourScene } from './scenes/TourScene';
 import { UIScene } from './scenes/UIScene';
 import { WorldScene } from './scenes/WorldScene';
 import { state } from './systems/GameState';
@@ -34,7 +35,7 @@ const game = new Phaser.Game({
   roundPixels: true,
   antialias: false,
   scale: { mode: Phaser.Scale.NONE },
-  scene: [BootScene, WorldScene, UIScene, IntroScene],
+  scene: [BootScene, WorldScene, UIScene, IntroScene, TourScene],
 });
 
 window.addEventListener('resize', () => {

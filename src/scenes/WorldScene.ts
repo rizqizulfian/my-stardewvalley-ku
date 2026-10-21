@@ -75,6 +75,9 @@ function dialog(req: DialogRequest): void {
 /** Where the player appears after a map change (set just before the scene restarts). */
 let arrival: { x: number; y: number; face: Facing } | null = null;
 
+/** While the place tour runs, the camera looks at this point (px) and the player is hidden. */
+export const tourView = { active: false, x: 0, y: 0 };
+
 export class WorldScene extends Phaser.Scene {
   private def!: MapDef;
   private map!: WorldMap;
@@ -121,6 +124,7 @@ export class WorldScene extends Phaser.Scene {
     this.player = new Player(this, this.map, PLAYER_CHARACTER.texture, sx, sy);
     this.player.facing = spot.face;
     this.player.onFootstep = (surface) => audio.footstep(surface);
+    if (tourView.active) this.player.setVisible(false);
 
     this.time2 = new TimeSystem(state);
     this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor, this.def.interiorStyle === 'paper');
@@ -244,7 +248,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.snapCamera();
     const entrance = this.def.entrance;
-    if (entrance) {
+    if (entrance && !tourView.active) {
       // Hold on black, then fade slowly up into the room.
       this.cameras.main.fadeOut(1, 0, 0, 0);
       this.time.delayedCall(entrance.blackMs, () => this.cameras.main.fadeIn(entrance.fadeMs, 0, 0, 0));
@@ -581,8 +585,9 @@ export class WorldScene extends Phaser.Scene {
     // Rooms smaller than the view sit in the middle of it.
     const fit = (size: number, view: number, focus: number) =>
       size <= view ? Math.round((size - view) / 2) : Phaser.Math.Clamp(focus - Math.floor(view / 2), 0, size - view);
-    const x = fit(this.map.pixelWidth, cam.width, Math.round(this.player.x));
-    const y = fit(this.map.pixelHeight, cam.height, Math.round(this.player.y) - CAMERA_FOCUS_OFFSET_Y);
+    const [fx, fy] = tourView.active ? [Math.round(tourView.x), Math.round(tourView.y)] : [Math.round(this.player.x), Math.round(this.player.y) - CAMERA_FOCUS_OFFSET_Y];
+    const x = fit(this.map.pixelWidth, cam.width, fx);
+    const y = fit(this.map.pixelHeight, cam.height, fy);
     return [x, y];
   }
 
