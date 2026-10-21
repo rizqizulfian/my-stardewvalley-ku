@@ -10,7 +10,7 @@ export const RENDER = {
    * zoom = window / view, usually not a whole number, so some art pixels come
    * out one screen pixel wider than their neighbours.
    */
-  viewTilesWide: 35,
+  viewTilesWide: 38,
   /** Fallback native size, also used for generated full-screen textures. */
   width: 480,
   height: 270,
