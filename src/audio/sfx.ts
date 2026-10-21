@@ -208,6 +208,11 @@ export const SFX: Record<string, SfxFn> = {
     thump(ctx, d, t, 170 * p, 120 * p, 0.09, 0.12, 'triangle');
     burst(ctx, d, t, { type: 'lowpass', freq: 800 * p, q: 1, dur: 0.05, gain: 0.06 });
   },
+  nope: (ctx, d, t, p) => {
+    // A soft "uh-uh": two short falling notes, for "that tool won't work here".
+    thump(ctx, d, t, 520 * p, 470 * p, 0.09, 0.07, 'triangle');
+    thump(ctx, d, t + 0.11, 400 * p, 330 * p, 0.13, 0.07, 'triangle');
+  },
   pickup: (ctx, d, t, p) => {
     thump(ctx, d, t, 880 * p, 1320 * p, 0.07, 0.05);
   },

@@ -15,6 +15,7 @@ import type { Player } from '../entities/Player';
 import { PixelText } from '../ui/PixelText';
 import type { Effects } from './Effects';
 import { EV, bus } from './events';
+import { hint } from './hints';
 import { isWet, type GameState } from './GameState';
 import { addItem, itemDef } from './Inventory';
 import { spendToolEnergy } from './needs';
@@ -96,8 +97,7 @@ export class Fishing {
     if (this.active || this.player.busy) return false;
     const spot = this.findWater();
     if (!spot) {
-      audio.playSfx('bonk', 0.4);
-      bus.emit(EV.notice, 'Face the water to cast your line.');
+      hint('Stand by the water and face it to cast your line.');
       return true;
     }
     if (!spendToolEnergy(this.state, 'rod')) {
