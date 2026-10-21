@@ -116,8 +116,20 @@ export class UIScene extends Phaser.Scene {
       this.shop.refresh();
     };
     refreshInv();
-    const onGained = (id: string, qty: number) => this.toasts.item(id, qty);
-    const onNotice = (msg: string) => this.notice.show(msg);
+    // On phones the help shares the top-left corner with messages, so it makes way.
+    const clearHelp = () => {
+      if (!touch) return;
+      this.tweens.killTweensOf(this.help);
+      this.help.setVisible(false);
+    };
+    const onGained = (id: string, qty: number) => {
+      clearHelp();
+      this.toasts.item(id, qty);
+    };
+    const onNotice = (msg: string) => {
+      clearHelp();
+      this.notice.show(msg);
+    };
     const onDialog = (req: DialogRequest) => {
       this.dialog.open(req);
       this.syncModal();
@@ -207,11 +219,19 @@ export class UIScene extends Phaser.Scene {
       this.summary.layout(this.scale.width, this.scale.height);
       const hb = this.hotbar.layout(this.scale.width, this.scale.height);
       uiState.hudRects = [hb];
-      this.notice.layout(this.scale.width, hb.y - 24);
-      this.toasts.layout(this.scale.height);
+      // Phones: messages and pickups go top-left, under the Menu/Tas buttons,
+      // since the joystick and action buttons sit around the hotbar.
+      const touchTop = Math.ceil(TOUCH_TOP_ROW / this.scale.zoom);
+      if (touch) {
+        this.notice.layout(this.scale.width, touchTop, 4);
+        this.toasts.layout(this.scale.height, touchTop + 12);
+      } else {
+        this.notice.layout(this.scale.width, hb.y - 24);
+        this.toasts.layout(this.scale.height);
+      }
       this.menu.layout(this.scale.width, this.scale.height);
       // Below the on-screen Menu/Tas buttons on phones.
-      this.help.y = touch ? Math.ceil(TOUCH_TOP_ROW / this.scale.zoom) : 4;
+      this.help.y = touch ? touchTop : 4;
       if (this.prompt) this.centerPrompt(this.prompt);
     };
     relayout();

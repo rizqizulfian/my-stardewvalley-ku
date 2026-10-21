@@ -24,15 +24,20 @@ interface Toast {
   timer: Phaser.Time.TimerEvent;
 }
 
-/** "+3 Wood" pickups stacked in the bottom-left corner. */
+/**
+ * "+3 Wood" pickups stacked in the bottom-left corner, or, on phones (where
+ * the joystick sits there), downward from `top` in the top-left corner.
+ */
 export class Toasts {
   private list: Toast[] = [];
   private bottom = 0;
+  private top: number | null = null;
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  layout(h: number): void {
+  layout(h: number, top: number | null = null): void {
     this.bottom = h - TOAST.margin;
+    this.top = top;
     this.restack();
   }
 
@@ -82,29 +87,35 @@ export class Toasts {
   }
 
   private restack(): void {
-    this.list.forEach((t, i) => (t.box.y = this.bottom - (i + 1) * (TOAST.height + TOAST.gap)));
+    const top = this.top;
+    this.list.forEach((t, i) => (t.box.y = top === null ? this.bottom - (i + 1) * (TOAST.height + TOAST.gap) : top + i * (TOAST.height + TOAST.gap)));
   }
 }
 
-/** A short centred message above the hotbar ("The watering can is empty"). */
+/**
+ * A short centred message above the hotbar ("The watering can is empty"), or
+ * left-aligned at `x` on phones, where the touch buttons flank the hotbar.
+ */
 export class Notice {
   private readonly text: PixelText;
   private timer?: Phaser.Time.TimerEvent;
   private y = 0;
+  private x: number | null = null;
 
   constructor(private readonly scene: Phaser.Scene) {
     this.text = new PixelText(scene, 0, 0, '', { color: 'cream', outline: 'night' }).setVisible(false);
   }
 
-  layout(w: number, y: number): void {
+  layout(w: number, y: number, x: number | null = null): void {
     this.y = y;
-    this.text.setPosition(Math.round((w - this.text.width) / 2), y);
+    this.x = x;
+    this.text.setPosition(x ?? Math.round((w - this.text.width) / 2), y);
   }
 
   show(msg: string): void {
     this.scene.tweens.killTweensOf(this.text);
     this.text.setText(msg).setVisible(true).setAlpha(1);
-    this.layout(this.scene.scale.width, this.y);
+    this.layout(this.scene.scale.width, this.y, this.x);
     this.timer?.remove();
     this.timer = this.scene.time.delayedCall(1600 + msg.length * 40, () =>
       this.scene.tweens.add({ targets: this.text, alpha: 0, duration: 350, onComplete: () => this.text.setVisible(false) }),
