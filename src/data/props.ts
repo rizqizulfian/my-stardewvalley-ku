@@ -69,6 +69,8 @@ export interface PropDef {
   use?: PropUse;
   /** Fruit the action button picks; it grows back after some days. */
   pick?: PickDef;
+  /** Signs with their own words (otherwise they read the map's sign). */
+  text?: string[];
   /** Sheet frame to show (one sheet holding several pictures). */
   frame?: number;
   /** Loops through sheet frames on its own (fountains, windmill sails). */
@@ -324,6 +326,18 @@ export const PROPS: Record<string, PropDef> = {
     shadow: PROP_TEXTURES.shadowL,
     emissive: X.dogHouseLit,
     lights: [{ x: 0, y: -14, texture: 'light-window', scale: 0.8 }],
+  },
+  warnSign: {
+    texture: X.warnSign,
+    footprint: { w: 1, h: 1 },
+    collider: { x: 5, y: 10, w: 6, h: 5 },
+    shadow: PROP_TEXTURES.shadowS,
+    use: 'sign',
+    text: [
+      'JANGAN MASUK!',
+      'Underneath, in small shaky letters: "Seriously. Do NOT open this door. Nobody who went in came out the same."',
+      'You lean closer. Faint music thumps somewhere behind the door...',
+    ],
   },
   museum: {
     texture: X.museum,

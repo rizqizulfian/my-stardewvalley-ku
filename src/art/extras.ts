@@ -10,6 +10,7 @@ export const EXTRA_TEXTURES = {
   phone: 'extra-phone',
   dogHouse: 'extra-dog-house',
   dogHouseLit: 'extra-dog-house-lit',
+  warnSign: 'extra-warn-sign',
   museum: 'extra-museum',
   museumLit: 'extra-museum-lit',
   bigFountain: 'extra-big-fountain',
@@ -166,6 +167,23 @@ function dogHouse(): [PixelGrid, PixelGrid] {
   ])
     g.set(px, py, 'mauve').set(px - 1, py - 1, 'mauve').set(px + 1, py - 1, 'mauve');
   return [outline(g, { steps: 2 }), lit];
+}
+
+/** A crooked red "AWAS!" board on a post by the dog's door. It only makes people curious. */
+function warnSign(): PixelGrid {
+  const W = 26;
+  const H = 28;
+  const g = new PixelGrid(W, H);
+  block(g, 12, 11, 3, 16, RAMPS.wood);
+  const b = new PixelGrid(W, H);
+  block(b, 1, 3, 24, 10, ['wine', 'brick', 'coral'], { rim: 0.3, gradient: 0.4 });
+  b.stamp(textGrid('AWAS!', 'cream'), 2, 5);
+  b.set(3, 4, 'mist').set(22, 4, 'mist');
+  // Hung crooked: the right side sags a little.
+  b.forEachFilled((x, y, c) => g.set(x, y + Math.floor(x / 9), c));
+  // A crack across the lower corner.
+  g.line(19, 12, 23, 14, 'wine');
+  return outline(g, { steps: 2 });
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +478,7 @@ export function registerExtras(sink: TextureSink): void {
   const [dh, dhLit] = dogHouse();
   sink.image(EXTRA_TEXTURES.dogHouse, dh);
   sink.image(EXTRA_TEXTURES.dogHouseLit, dhLit);
+  sink.image(EXTRA_TEXTURES.warnSign, warnSign());
   const [mu, muLit] = museum();
   sink.image(EXTRA_TEXTURES.museum, mu);
   sink.image(EXTRA_TEXTURES.museumLit, muLit);

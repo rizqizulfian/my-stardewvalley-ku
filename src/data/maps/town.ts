@@ -48,7 +48,7 @@ export const TOWN_MAP: MapDef = {
     'TT----------------------------------#######-BY',
     'BT###--------#####E---------#####---#######-YT',
     'BBD##--------#####----------#####---C######-BB',
-    'BB---P-B-----4####pp------pp5####-----------BB',
+    'BB--Z-PB-----4####pp------pp5####-----------BB',
     'YT---------L-------------------------L-------T',
     'FT-------h-----------------------------------F',
     '-----Y----------------------------N#--------F-',
@@ -87,7 +87,7 @@ export const TOWN_MAP: MapDef = {
   ambience: { birds: 0.7, wind: 0.5, crickets: 0.8, water: 0.35 },
   backdrop: 'pine',
   leaves: true,
-  propLegend: { D: 'dogHouse', C: 'museum' },
+  propLegend: { D: 'dogHouse', C: 'museum', Z: 'warnSign' },
   warps: [
     { x: 0, y: 13, h: 3, to: 'village', tx: 42, ty: 14, face: 'left' },
     { x: 45, y: 13, h: 3, to: 'park', tx: 1, ty: 14, face: 'right' },
