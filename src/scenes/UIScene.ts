@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEBUG, GAME_TITLE } from '../config';
 import type { DaySummary } from '../systems/day';
 import { audio } from '../audio/AudioManager';
+import { OPENING_TRACK } from '../data/music';
 import { EV, bus } from '../systems/events';
 import { newGameState, state } from '../systems/GameState';
 import { clearSave, hasSave } from '../systems/save';
@@ -299,6 +300,7 @@ export class UIScene extends Phaser.Scene {
       if (begun || this.dialog.isOpen) return;
       begun = true;
       blink.remove();
+      audio.startOpening(OPENING_TRACK);
       void audio.unlock().then(() => audio.playSfx('start', 0.8));
       if (state.introSeen) this.startPlaying();
       else this.playIntro();

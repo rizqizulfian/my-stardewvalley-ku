@@ -111,6 +111,12 @@ export class AudioManager {
   private ambience: AmbienceLayer[] = [];
   private timer: number | undefined;
   private pendingTrack: string | null = null;
+  /**
+   * The opening song: it plays first whatever the map or hour, and holds the
+   * music until it has played through once (or the player leaves the map).
+   * `wanted` is the track the game asked for meanwhile; it takes over after.
+   */
+  private opening: { id: string; wanted: string | null; endsAt: number | null } | null = null;
   readonly settings: AudioSettings;
 
   constructor() {
@@ -179,15 +185,51 @@ export class AudioManager {
     if (this.pendingTrack) {
       const id = this.pendingTrack;
       this.pendingTrack = null;
-      this.playMusic(id);
+      this.switchTo(id);
     }
   }
 
   // -------------------------------------------------------------------------
   // Music
 
+  /**
+   * Start the opening song from its beginning. Call it on the first key press
+   * or tap, before the world asks for its own music.
+   */
+  startOpening(id: string): void {
+    const def = TRACKS_BY_ID[id];
+    if (!def) return;
+    this.opening = { id, wanted: this.current?.id ?? this.pendingTrack, endsAt: null };
+    if (def.kind === 'file') resumeAt.delete(def.url);
+    this.switchTo(id);
+  }
+
+  /**
+   * Let situational music take over from the opening song. With `follow`, the
+   * track the game asked for meanwhile fades in now; without it, the caller is
+   * about to ask for one itself (e.g. a map change).
+   */
+  endOpening(follow = true): void {
+    const o = this.opening;
+    if (!o) return;
+    this.opening = null;
+    if (follow && o.wanted) this.switchTo(o.wanted);
+  }
+
+  get openingPlaying(): boolean {
+    return this.opening !== null;
+  }
+
   /** Crossfade to a track. Requesting the playing track does nothing. */
   playMusic(id: string): void {
+    if (this.opening) {
+      this.opening.wanted = id;
+      return;
+    }
+    this.switchTo(id);
+  }
+
+  private switchTo(id: string): void {
     if (!this.ctx) {
       this.pendingTrack = id;
       return;
@@ -217,6 +259,15 @@ export class AudioManager {
         ? new GenerativeTrack(ctx, def, this.buses.music, this.reverbIn)
         : new FileTrack(ctx, def, this.buses.music);
     source.start(now);
+    if (this.opening?.id === id && def.kind === 'file') {
+      const o = this.opening;
+      // Hand over one crossfade before the song's end, so it plays through once.
+      void loadFile(ctx, def.url)
+        .then((buf) => {
+          if (this.opening === o) o.endsAt = ctx.currentTime + buf.duration - fade;
+        })
+        .catch(() => this.endOpening());
+    }
     source.output.gain.setValueAtTime(0.0001, now);
     source.output.gain.linearRampToValueAtTime(1, now + fade);
     this.current = { id, source };
@@ -338,6 +389,7 @@ export class AudioManager {
     if (!ctx || ctx.state !== 'running') return;
     const now = ctx.currentTime;
     const horizon = now + AUDIO.scheduleAheadSeconds;
+    if (this.opening?.endsAt != null && now >= this.opening.endsAt) this.endOpening();
     this.current?.source.scheduleUntil(horizon);
     for (const f of this.fading) f.source.scheduleUntil(horizon);
     this.fading = this.fading.filter((f) => !f.source.stopped);
