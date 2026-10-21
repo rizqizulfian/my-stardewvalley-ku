@@ -330,7 +330,7 @@ export class WorldScene extends Phaser.Scene {
         this.readMail();
         return true;
       case 'sign':
-        dialog({ pages: [this.def.sign ?? 'The sign is too weathered to read.'] });
+        dialog({ pages: p.def.text ?? [this.def.sign ?? 'The sign is too weathered to read.'] });
         return true;
       case 'board':
         dialog({ pages: [...(this.def.board ?? ['Nothing pinned up today.']), `Weather tomorrow: ${FORECAST[state.tomorrow]}`] });
