@@ -38,6 +38,13 @@ export const ITEMS: Record<string, ItemDef> = {
   cabai: { id: 'cabai', name: 'Chili', kind: 'produce', icon: 'cabai', stack: STACK, price: 35 },
   terong: { id: 'terong', name: 'Eggplant', kind: 'produce', icon: 'terong', stack: STACK, price: 45 },
 
+  seedMatahari: { id: 'seedMatahari', name: 'Sunflower Seeds', kind: 'seed', icon: 'seedMatahari', stack: STACK, price: 25, crop: 'matahari' },
+  seedMawar: { id: 'seedMawar', name: 'Rose Seeds', kind: 'seed', icon: 'seedMawar', stack: STACK, price: 30, crop: 'mawar' },
+  seedMelati: { id: 'seedMelati', name: 'Jasmine Seeds', kind: 'seed', icon: 'seedMelati', stack: STACK, price: 20, crop: 'melati' },
+  matahari: { id: 'matahari', name: 'Sunflower', kind: 'produce', icon: 'matahari', stack: STACK, price: 60 },
+  mawar: { id: 'mawar', name: 'Rose', kind: 'produce', icon: 'mawar', stack: STACK, price: 70 },
+  melati: { id: 'melati', name: 'Jasmine', kind: 'produce', icon: 'melati', stack: STACK, price: 55 },
+
   wood: { id: 'wood', name: 'Wood', kind: 'resource', icon: 'wood', stack: STACK, price: 2 },
   stone: { id: 'stone', name: 'Stone', kind: 'resource', icon: 'stone', stack: STACK, price: 2 },
   fiber: { id: 'fiber', name: 'Fiber', kind: 'resource', icon: 'fiber', stack: STACK, price: 1 },
@@ -54,4 +61,8 @@ export const STARTING_ITEMS: Array<[string, number]> = [
   ['seedJagung', 10],
   ['seedCabai', 10],
   ['seedTerong', 10],
+  // Flower seeds start in the backpack (second row).
+  ['seedMatahari', 5],
+  ['seedMawar', 5],
+  ['seedMelati', 5],
 ];

@@ -82,7 +82,16 @@ export class WorldMap {
         if (def.collider) {
           const left = x * T;
           const top = (y - def.footprint.h + 1) * T;
-          placed.collider = this.addCollider({ x: left + def.collider.x, y: top + def.collider.y, w: def.collider.w, h: def.collider.h });
+          let c = def.collider;
+          // Fences: the rails between posts block too, so extend toward each joined neighbour.
+          if (def.connects) {
+            const x0 = connections & 8 ? 0 : c.x;
+            const x1 = connections & 2 ? T : c.x + c.w;
+            const y0 = connections & 1 ? 0 : c.y;
+            const y1 = connections & 4 ? T : c.y + c.h;
+            c = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+          }
+          placed.collider = this.addCollider({ x: left + c.x, y: top + c.y, w: c.w, h: c.h });
         }
       }
     }

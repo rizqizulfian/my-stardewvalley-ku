@@ -2,7 +2,7 @@
 // frames and the tile cursor. Tools are rasterised from a handle plus a head
 // shape at any angle, so the icon and every swing frame share one drawing.
 
-import { PixelGrid, blobMask, hash2, outline, rng, shade, type TextureSink } from './pixel';
+import { PixelGrid, blobMask, hash2, outline, shade, type TextureSink } from './pixel';
 import { RAMPS, type ColorName } from './palette';
 import { CROPS, ripeStage } from '../data/crops';
 import type { ToolKind } from '../data/items';
@@ -35,6 +35,12 @@ export const ICON_NAMES = [
   'wood',
   'stone',
   'fiber',
+  'seedMatahari',
+  'seedMawar',
+  'seedMelati',
+  'matahari',
+  'mawar',
+  'melati',
 ] as const;
 
 export function iconFrame(name: string): number {
@@ -345,6 +351,44 @@ function fiberIcon(): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
+function sunflowerIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.line(8, 15, 8, 9, 'leaf');
+  leafBlade(g, 8, 13, 12, 11, 1, 'leaf', 'grass');
+  for (let a = 0; a < 12; a++) {
+    const ang = (a / 12) * Math.PI * 2;
+    g.set(Math.round(8 + Math.cos(ang) * 5), Math.round(6 + Math.sin(ang) * 5), a % 2 ? 'gold' : 'amber');
+    g.set(Math.round(8 + Math.cos(ang) * 4), Math.round(6 + Math.sin(ang) * 4), 'gold');
+  }
+  g.fillEllipse(5, 3, 7, 7, 'umber').set(6, 4, 'clay').set(7, 5, 'clay').set(10, 8, 'bark');
+  return outline(g, { steps: 2 });
+}
+
+function roseIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.line(8, 15, 8, 8, 'moss').set(7, 12, 'wine');
+  leafBlade(g, 8, 12, 4, 10, 1, 'moss', 'leaf');
+  const m = blobMask(16, 16, [[8, 6, 4, 4]]);
+  g.stamp(shade(m, ['wine', 'brick', 'rose', 'peach'], { rim: 0.3, gradient: 0.6 }));
+  g.line(6, 5, 9, 4, 'wine').line(9, 6, 7, 8, 'wine').set(8, 6, 'wine').set(6, 3, 'peach');
+  return outline(g, { steps: 2 });
+}
+
+function jasmineIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.line(5, 15, 8, 9, 'leaf').line(11, 15, 9, 10, 'leaf');
+  leafBlade(g, 7, 12, 3, 11, 1, 'leaf', 'grass');
+  for (const [x, y] of [
+    [5, 6],
+    [10, 5],
+    [8, 9],
+  ]) {
+    g.fillRect(x - 1, y, 3, 1, 'cream').fillRect(x, y - 1, 1, 3, 'cream');
+    g.set(x - 2, y, 'mist').set(x + 2, y, 'mist').set(x, y - 2, 'mist').set(x, y + 2, 'mist').set(x, y, 'gold');
+  }
+  return outline(g, { steps: 2 });
+}
+
 function icons(): PixelGrid[] {
   const make: Record<(typeof ICON_NAMES)[number], () => PixelGrid> = {
     hoe: () => toolIcon('hoe'),
@@ -372,6 +416,20 @@ function icons(): PixelGrid[] {
     wood: woodIcon,
     stone: stoneIcon,
     fiber: fiberIcon,
+    seedMatahari: () => seedPacket((g) => sunflowerIcon().crop(3, 1, 10, 10).forEachFilled((x, y, c) => (y < 9 ? g.set(x + 3, y + 4, c) : null))),
+    seedMawar: () => seedPacket((g) => g.fillRect(6, 6, 4, 4, 'brick').set(6, 6, 'rose').set(8, 8, 'wine').line(8, 10, 8, 12, 'moss').set(9, 11, 'leaf')),
+    seedMelati: () =>
+      seedPacket((g) => {
+        for (const [x, y] of [
+          [6, 7],
+          [10, 9],
+        ])
+          g.fillRect(x - 1, y, 3, 1, 'cream').fillRect(x, y - 1, 1, 3, 'cream').set(x, y, 'gold');
+        g.line(7, 12, 9, 10, 'leaf');
+      }),
+    matahari: sunflowerIcon,
+    mawar: roseIcon,
+    melati: jasmineIcon,
   };
   return ICON_NAMES.map((n) => make[n]());
 }
@@ -438,75 +496,104 @@ function blade(g: PixelGrid, x0: number, y0: number, x1: number, y1: number, ram
 }
 
 const GREEN: readonly ColorName[] = ['moss', 'leaf', 'grass', 'lime'];
-const RIPE_GREEN: readonly ColorName[] = ['leaf', 'grass', 'lime', 'gold'];
+/** Ripe rice turns from green at the root to straw gold at the tips. */
+const RICE_GOLD: readonly ColorName[] = ['leaf', 'amber', 'gold', 'sand'];
 
-function seeded(color: ColorName): PixelGrid {
-  // A small mound of fresh earth with the seeds peeking out, so a just-planted
-  // cell reads clearly against the furrows.
+/**
+ * A mound of fresh earth with the seeds peeking out, plus a little marker
+ * stake whose flag has the crop's colour, so each bed reads at a glance.
+ */
+function seeded(seed: ColorName, flag: ColorName, flagDark: ColorName): PixelGrid {
   const g = new PixelGrid(CW, CH);
-  g.fillEllipse(3, BASE_Y - 4, 10, 5, 'umber');
-  g.fillEllipse(4, BASE_Y - 4, 8, 3, 'clay');
+  g.fillEllipse(2, BASE_Y - 4, 10, 5, 'umber');
+  g.fillEllipse(3, BASE_Y - 4, 8, 3, 'clay');
   for (const [x, y] of [
-    [5, BASE_Y - 3],
-    [8, BASE_Y - 4],
-    [10, BASE_Y - 2],
+    [4, BASE_Y - 3],
+    [7, BASE_Y - 4],
+    [9, BASE_Y - 2],
   ])
-    g.set(x, y, color).set(x + 1, y, 'cream');
+    g.set(x, y, seed).set(x + 1, y, 'cream');
+  g.line(13, BASE_Y - 9, 13, BASE_Y - 1, 'tan');
+  g.fillRect(10, BASE_Y - 9, 3, 3, flag).set(10, BASE_Y - 7, flagDark).set(11, BASE_Y - 7, flagDark);
   return outline(g, { color: 'bark' });
 }
 
-function sprout(): PixelGrid {
-  const g = new PixelGrid(CW, CH);
-  g.line(8, BASE_Y, 8, BASE_Y - 3, 'leaf');
-  g.set(7, BASE_Y - 4, 'grass').set(6, BASE_Y - 4, 'lime').set(9, BASE_Y - 4, 'grass').set(10, BASE_Y - 5, 'lime').set(8, BASE_Y - 4, 'leaf');
+/** Shaded foliage blob with an organic edge. */
+function leafy(circles: ReadonlyArray<[number, number, number, number?]>, ramp: readonly ColorName[], seed: number): PixelGrid {
+  return shade(blobMask(CW, CH, circles), ramp, { rim: 0.3, gradient: 0.6, noise: 0.18, seed });
+}
+
+/** A leaf as a small filled lens from the stem out to a tip. */
+function leafBlade(g: PixelGrid, x0: number, y0: number, x1: number, y1: number, width: number, dark: ColorName, light: ColorName): void {
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = Math.round(x0 + (x1 - x0) * t);
+    const y = Math.round(y0 + (y1 - y0) * t);
+    const w = Math.round(Math.sin(t * Math.PI) * width);
+    for (let k = -w; k <= w; k++) g.set(x, y + k, k < 0 ? light : dark);
+  }
+}
+
+function finish(g: PixelGrid): PixelGrid {
   return outline(g, { color: 'pine' });
 }
 
+// Rice: fine upright blades in a fan, turning golden with drooping grain heads.
 function padiFrames(): PixelGrid[] {
-  const stage2 = new PixelGrid(CW, CH);
+  const sprout = new PixelGrid(CW, CH);
   for (const [x, y] of [
-    [3, 15],
-    [5, 13],
-    [7, 12],
-    [9, 12],
-    [11, 13],
-    [13, 15],
+    [6, 15],
+    [8, 13],
+    [10, 15],
   ])
-    blade(stage2, 8, BASE_Y, x, y, GREEN);
-  const tall = (ramp: readonly ColorName[]) => {
+    blade(sprout, 8, BASE_Y, x, y, ['leaf', 'grass', 'lime']);
+  const fan = (tips: Array<[number, number]>, ramp: readonly ColorName[]) => {
     const g = new PixelGrid(CW, CH);
-    for (const [x, y] of [
-      [2, 12],
-      [4, 9],
-      [6, 7],
-      [8, 6],
-      [10, 7],
-      [12, 9],
-      [14, 12],
-      [7, 10],
-      [9, 10],
-    ])
-      blade(g, 8, BASE_Y, x, y, ramp);
+    for (const [x, y] of tips) blade(g, 8, BASE_Y, x, y, ramp);
     return g;
   };
-  const stage3 = tall(GREEN);
-  const ripe = tall(RIPE_GREEN);
-  // Drooping golden panicles.
+  const stage2 = fan(
+    [
+      [3, 14],
+      [5, 12],
+      [7, 10],
+      [9, 10],
+      [11, 12],
+      [13, 14],
+    ],
+    GREEN,
+  );
+  const tallTips: Array<[number, number]> = [
+    [1, 11],
+    [3, 8],
+    [5, 6],
+    [7, 4],
+    [9, 4],
+    [11, 6],
+    [13, 8],
+    [15, 11],
+    [6, 9],
+    [10, 9],
+  ];
+  const stage3 = fan(tallTips, GREEN);
+  const ripe = fan(tallTips, RICE_GOLD);
   for (const [x0, y0, dir] of [
-    [6, 7, -1],
-    [10, 7, 1],
-    [8, 6, -1],
-    [4, 9, -1],
-    [12, 9, 1],
+    [5, 6, -1],
+    [7, 4, -1],
+    [9, 4, 1],
+    [11, 6, 1],
+    [3, 8, -1],
+    [13, 8, 1],
   ] as const) {
-    for (let k = 0; k < 5; k++) {
-      const x = x0 + dir * Math.round(k * 0.6);
+    for (let k = 0; k < 6; k++) {
+      const x = x0 + dir * Math.round(k * 0.5);
       const y = y0 + k;
       ripe.set(x, y, k % 2 ? 'amber' : 'gold');
-      if (k === 1) ripe.set(x - dir, y, 'cream');
+      if (k % 2 === 0) ripe.set(x + dir, y, 'cream');
     }
   }
-  return [seeded('sand'), sprout(), outline(stage2, { color: 'pine' }), outline(stage3, { color: 'pine' }), outline(ripe, { color: 'pine' })];
+  return [seeded('cream', 'lime', 'leaf'), finish(sprout), finish(stage2), finish(stage3), finish(ripe)];
 }
 
 function cornLeaf(g: PixelGrid, x: number, y: number, dir: number, len: number): void {
@@ -514,110 +601,255 @@ function cornLeaf(g: PixelGrid, x: number, y: number, dir: number, len: number):
     const t = i / len;
     const lx = x + dir * (i + 1);
     const ly = y - Math.round(Math.sin(t * Math.PI * 0.8) * 2.5) + Math.round(t * t * 3);
-    g.set(lx, ly, t < 0.3 ? 'leaf' : t < 0.75 ? 'grass' : 'lime');
-    if (t < 0.6) g.set(lx, ly + 1, 'leaf');
+    g.set(lx, ly, t < 0.3 ? 'moss' : t < 0.75 ? 'leaf' : 'grass');
+    if (t < 0.7) g.set(lx, ly + 1, 'moss');
   }
 }
 
+// Corn: one thick stalk with long arching leaves, cobs and a tassel.
 function jagungFrames(): PixelGrid[] {
   const stalk = (top: number) => {
     const g = new PixelGrid(CW, CH);
-    g.fillRect(7, top, 1, BASE_Y - top + 1, 'grass').fillRect(8, top, 1, BASE_Y - top + 1, 'leaf');
+    g.fillRect(7, top, 1, BASE_Y - top + 1, 'leaf').fillRect(8, top, 1, BASE_Y - top + 1, 'moss');
     return g;
   };
-  const s2 = stalk(14);
-  cornLeaf(s2, 7, 19, -1, 5);
-  cornLeaf(s2, 8, 17, 1, 5);
-  cornLeaf(s2, 7, 15, -1, 4);
+  const sprout = stalk(16);
+  cornLeaf(sprout, 7, 18, -1, 4);
+  cornLeaf(sprout, 8, 17, 1, 4);
+  const s2 = stalk(12);
+  cornLeaf(s2, 7, 19, -1, 6);
+  cornLeaf(s2, 8, 16, 1, 6);
+  cornLeaf(s2, 7, 13, -1, 4);
   const big = () => {
-    const g = stalk(4);
-    cornLeaf(g, 7, 19, -1, 6);
-    cornLeaf(g, 8, 16, 1, 6);
-    cornLeaf(g, 7, 13, -1, 6);
-    cornLeaf(g, 8, 10, 1, 5);
-    cornLeaf(g, 7, 7, -1, 4);
+    const g = stalk(3);
+    cornLeaf(g, 7, 20, -1, 7);
+    cornLeaf(g, 8, 17, 1, 7);
+    cornLeaf(g, 7, 14, -1, 7);
+    cornLeaf(g, 8, 11, 1, 6);
+    cornLeaf(g, 7, 8, -1, 5);
+    cornLeaf(g, 8, 6, 1, 4);
     return g;
   };
   const s3 = big();
   const ripe = big();
-  // Cob in its husk, and the tassel on top.
-  ripe.fillRect(9, 11, 3, 6, 'gold').fillRect(9, 11, 1, 6, 'cream').fillRect(11, 12, 1, 5, 'amber');
-  ripe.set(10, 10, 'lime').set(9, 17, 'grass').set(10, 17, 'leaf').set(11, 17, 'leaf');
+  // Two cobs in their husks and a golden tassel.
   for (const [x, y] of [
-    [6, 2],
+    [9, 10],
+    [4, 14],
+  ]) {
+    ripe.fillRect(x, y, 3, 6, 'gold').fillRect(x, y, 1, 6, 'cream').fillRect(x + 2, y + 1, 1, 5, 'amber');
+    ripe.set(x + 1, y - 1, 'sand').set(x, y + 6, 'grass').set(x + 1, y + 6, 'leaf').set(x + 2, y + 6, 'leaf');
+  }
+  for (const [x, y] of [
+    [5, 1],
+    [6, 0],
     [7, 1],
-    [8, 2],
+    [8, 0],
     [9, 1],
-    [7, 3],
-    [8, 3],
+    [10, 2],
+    [6, 2],
+    [8, 2],
   ])
-    ripe.set(x, y, y < 2 ? 'sand' : 'amber');
-  return [seeded('gold'), sprout(), outline(s2, { color: 'pine' }), outline(s3, { color: 'pine' }), outline(ripe, { color: 'pine' })];
+    ripe.set(x, y, y < 1 ? 'sand' : 'amber');
+  return [seeded('gold', 'amber', 'clay'), finish(sprout), finish(s2), finish(s3), finish(ripe)];
 }
 
-function bushFrames(seed: number, flower: ColorName, fruit: (g: PixelGrid) => void, big: boolean): PixelGrid[] {
-  const bush = (w: number, h: number, s: number) => {
+// Chili: an upright, narrow, dark bush on branching stems; white flowers, then
+// lots of long red pods hanging down.
+function cabaiFrames(): PixelGrid[] {
+  const DARK: readonly ColorName[] = ['pine', 'moss', 'leaf', 'grass'];
+  const stems = (g: PixelGrid, top: number) => {
+    g.line(8, BASE_Y, 8, top, 'moss');
+    g.line(8, top + 6, 5, top + 2, 'moss').line(8, top + 4, 11, top, 'moss');
+  };
+  const sprout = new PixelGrid(CW, CH);
+  sprout.line(8, BASE_Y, 8, BASE_Y - 4, 'leaf');
+  leafBlade(sprout, 8, BASE_Y - 4, 5, BASE_Y - 6, 1, 'leaf', 'lime');
+  leafBlade(sprout, 8, BASE_Y - 4, 11, BASE_Y - 6, 1, 'leaf', 'lime');
+  const s2 = new PixelGrid(CW, CH);
+  stems(s2, 13);
+  s2.stamp(leafy([[8, 13, 3.5, 4], [5, 15, 2.5, 2.5], [11, 14, 2.5, 2.5]], DARK, 1201));
+  const bush = () => {
     const g = new PixelGrid(CW, CH);
-    g.line(8, BASE_Y, 8, BASE_Y - 3, 'leaf');
-    const cy = BASE_Y - 3 - h / 2;
-    const mask = blobMask(CW, CH, [
-      [8, cy, w / 2, h / 2],
-      [8 - w / 4, cy + 1, w / 3, h / 3],
-      [8 + w / 4, cy + 1, w / 3, h / 3],
-    ]);
-    g.stamp(shade(mask, RAMPS.foliage.slice(1), { rim: 0.3, gradient: 0.6, noise: 0.15, seed: s }));
+    stems(g, 6);
+    g.stamp(leafy([[8, 9, 4, 6], [5, 12, 3, 4], [11, 11, 3, 4], [8, 4, 3, 3]], DARK, 1202));
+    // Pointed leaf tips poking out of the silhouette.
+    for (const [x, y] of [
+      [3, 11],
+      [13, 10],
+      [8, 1],
+      [4, 15],
+      [12, 15],
+    ])
+      g.set(x, y, 'leaf');
     return g;
   };
-  const s2 = bush(big ? 9 : 8, big ? 7 : 6, seed);
-  const s3 = bush(big ? 13 : 12, big ? 11 : 10, seed + 1);
-  const flowering = s3.clone();
-  const r = rng(seed + 5);
-  for (let i = 0; i < 4; i++) {
-    const x = 4 + Math.floor(r() * 8);
-    const y = 8 + Math.floor(r() * 7);
-    if (flowering.filled(x, y)) flowering.set(x, y, flower).set(x + 1, y, 'cream');
+  const flowering = bush();
+  for (const [x, y] of [
+    [6, 7],
+    [10, 9],
+    [7, 12],
+    [11, 5],
+  ])
+    flowering.set(x, y, 'cream').set(x + 1, y, 'mist').set(x, y + 1, 'gold');
+  const ripe = bush();
+  for (const [x, y] of [
+    [4, 9],
+    [6, 13],
+    [9, 7],
+    [11, 11],
+    [12, 6],
+    [7, 4],
+    [10, 14],
+  ]) {
+    ripe.set(x, y - 1, 'moss');
+    ripe.set(x, y, 'coral').set(x, y + 1, 'brick').set(x, y + 2, 'brick').set(x + 1, y + 3, 'wine').set(x - 1, y, 'peach');
   }
-  const ripe = s3.clone();
-  fruit(ripe);
-  return [seeded('sand'), sprout(), outline(s2, { color: 'pine' }), outline(flowering, { color: 'pine' }), outline(ripe, { color: 'pine' })];
+  return [seeded('sand', 'brick', 'wine'), finish(sprout), finish(s2), finish(flowering), finish(ripe)];
 }
 
-function cabaiFrames(): PixelGrid[] {
-  return bushFrames(
-    1201,
-    'cream',
-    (g) => {
-      for (const [x, y] of [
-        [4, 12],
-        [7, 15],
-        [10, 11],
-        [12, 15],
-        [6, 9],
-      ]) {
-        g.set(x, y - 1, 'leaf');
-        g.set(x, y, 'coral').set(x, y + 1, 'brick').set(x + 1, y + 2, 'brick').set(x - 1, y, 'peach');
-      }
-    },
-    false,
-  );
-}
-
+// Eggplant: low and wide, with big broad leaves on purple stems; lilac flowers,
+// then fat glossy purple fruit.
 function terongFrames(): PixelGrid[] {
-  return bushFrames(
-    1301,
-    'lilac',
-    (g) => {
-      for (const [x, y] of [
-        [4, 12],
-        [10, 14],
-        [7, 9],
-      ]) {
-        g.fillRect(x, y, 3, 4, 'violet').fillRect(x, y, 1, 3, 'lilac').fillRect(x + 1, y + 4, 2, 1, 'night').set(x + 2, y + 3, 'night');
-        g.set(x, y - 1, 'leaf').set(x + 1, y - 1, 'grass').set(x + 2, y - 1, 'leaf');
-      }
-    },
-    true,
-  );
+  const BROAD: readonly ColorName[] = ['moss', 'leaf', 'leaf', 'grass'];
+  const sprout = new PixelGrid(CW, CH);
+  sprout.line(8, BASE_Y, 8, BASE_Y - 3, 'violet');
+  leafBlade(sprout, 8, BASE_Y - 3, 4, BASE_Y - 5, 2, 'leaf', 'grass');
+  leafBlade(sprout, 8, BASE_Y - 3, 12, BASE_Y - 5, 2, 'leaf', 'grass');
+  const wide = (h: number, seed: number) => {
+    const g = new PixelGrid(CW, CH);
+    const cy = BASE_Y - 2 - h / 2;
+    g.stamp(leafy([[4, cy + 1, 4, h / 2], [12, cy + 1, 4, h / 2], [8, cy - 1, 4.5, h / 2]], BROAD, seed));
+    // Purple veins and stems.
+    g.line(8, BASE_Y, 8, cy, 'violet').line(8, cy + 2, 3, cy, 'violet').line(8, cy + 2, 13, cy, 'violet');
+    return g;
+  };
+  const s2 = wide(6, 1301);
+  const s3 = wide(10, 1302);
+  const flowering = s3.clone();
+  for (const [x, y] of [
+    [5, 11],
+    [10, 12],
+    [12, 9],
+  ])
+    flowering.set(x, y, 'lilac').set(x + 1, y, 'lilac').set(x, y + 1, 'lilac').set(x + 1, y + 1, 'gold');
+  const ripe = s3.clone();
+  for (const [x, y] of [
+    [3, 14],
+    [10, 15],
+    [7, 11],
+  ]) {
+    const fruit = shade(blobMask(CW, CH, [[x + 2, y + 3, 2.2, 3]]), ['night', 'violet', 'violet', 'lilac'], { rim: 0.35, gradient: 0.7 });
+    ripe.stamp(fruit);
+    ripe.set(x + 1, y + 1, 'rose');
+    ripe.fillRect(x + 1, y - 1, 3, 1, 'leaf').set(x + 2, y - 2, 'moss');
+  }
+  return [seeded('tan', 'violet', 'night'), finish(sprout), finish(s2), finish(flowering), finish(ripe)];
+}
+
+// Sunflower: a tall stalk with heart leaves and a big golden head.
+function matahariFrames(): PixelGrid[] {
+  const stalk = (top: number, leaves: number) => {
+    const g = new PixelGrid(CW, CH);
+    g.fillRect(7, top, 2, BASE_Y - top + 1, 'leaf').fillRect(8, top, 1, BASE_Y - top + 1, 'moss');
+    for (let i = 0; i < leaves; i++) {
+      const y = BASE_Y - 4 - i * 4;
+      const d = i % 2 ? 1 : -1;
+      leafBlade(g, 8, y, 8 + d * 5, y - 1, 2, 'leaf', 'grass');
+    }
+    return g;
+  };
+  const sprout = new PixelGrid(CW, CH);
+  sprout.line(8, BASE_Y, 8, BASE_Y - 4, 'leaf');
+  leafBlade(sprout, 8, BASE_Y - 4, 5, BASE_Y - 5, 1, 'leaf', 'lime');
+  leafBlade(sprout, 8, BASE_Y - 4, 11, BASE_Y - 5, 1, 'leaf', 'lime');
+  const s2 = stalk(12, 2);
+  const bud = stalk(5, 3);
+  bud.fillEllipse(6, 2, 5, 5, 'leaf').set(7, 3, 'grass').set(8, 1, 'gold');
+  const bloom = stalk(8, 3);
+  // Petals around a dark seed disc.
+  for (let a = 0; a < 12; a++) {
+    const ang = (a / 12) * Math.PI * 2;
+    const x = Math.round(8 + Math.cos(ang) * 5);
+    const y = Math.round(5 + Math.sin(ang) * 4);
+    bloom.set(x, y, a % 2 ? 'gold' : 'amber');
+    bloom.set(Math.round(8 + Math.cos(ang) * 4), Math.round(5 + Math.sin(ang) * 3), 'gold');
+  }
+  bloom.fillEllipse(6, 3, 5, 5, 'umber').set(7, 4, 'clay').set(9, 6, 'bark').set(4, 2, 'cream');
+  return [seeded('night', 'gold', 'amber'), finish(sprout), finish(s2), finish(bud), finish(bloom)];
+}
+
+// Rose: a dark thorny bush with deep red and pink blooms.
+function mawarFrames(): PixelGrid[] {
+  const DARK: readonly ColorName[] = ['pine', 'moss', 'leaf', 'leaf'];
+  const sprout = new PixelGrid(CW, CH);
+  sprout.line(8, BASE_Y, 8, BASE_Y - 5, 'moss').set(7, BASE_Y - 3, 'wine');
+  leafBlade(sprout, 8, BASE_Y - 5, 5, BASE_Y - 7, 1, 'moss', 'leaf');
+  leafBlade(sprout, 8, BASE_Y - 4, 11, BASE_Y - 6, 1, 'moss', 'leaf');
+  const bush = (h: number, seed: number) => {
+    const g = new PixelGrid(CW, CH);
+    const cy = BASE_Y - 2 - h / 2;
+    g.line(8, BASE_Y, 8, cy, 'moss');
+    g.stamp(leafy([[8, cy, 5.5, h / 2], [4, cy + 2, 3, 3], [12, cy + 2, 3, 3]], DARK, seed));
+    return g;
+  };
+  const s2 = bush(7, 1401);
+  const budding = bush(12, 1402);
+  for (const [x, y] of [
+    [5, 11],
+    [10, 9],
+    [8, 13],
+  ])
+    budding.set(x, y, 'wine').set(x, y - 1, 'brick');
+  const bloom = bush(12, 1402);
+  for (const [x, y, c] of [
+    [4, 10, 'brick'],
+    [9, 8, 'rose'],
+    [11, 12, 'brick'],
+    [6, 14, 'rose'],
+    [8, 11, 'brick'],
+  ] as Array<[number, number, ColorName]>) {
+    // A small spiral bloom: petals, a dark heart and a highlight.
+    const hl: ColorName = c === 'rose' ? 'cream' : 'rose';
+    const dk: ColorName = c === 'rose' ? 'brick' : 'wine';
+    bloom.fillRect(x, y, 3, 3, c).set(x + 1, y + 1, dk).set(x, y, hl).set(x + 2, y + 2, dk);
+  }
+  return [seeded('umber', 'rose', 'brick'), finish(sprout), finish(s2), finish(budding), finish(bloom)];
+}
+
+// Jasmine: a bright, airy bush covered in little white star flowers.
+function melatiFrames(): PixelGrid[] {
+  const sprout = new PixelGrid(CW, CH);
+  sprout.line(8, BASE_Y, 8, BASE_Y - 4, 'leaf');
+  leafBlade(sprout, 8, BASE_Y - 4, 6, BASE_Y - 7, 1, 'grass', 'lime');
+  leafBlade(sprout, 8, BASE_Y - 3, 11, BASE_Y - 5, 1, 'grass', 'lime');
+  const bush = (h: number, seed: number) => {
+    const g = new PixelGrid(CW, CH);
+    const cy = BASE_Y - 2 - h / 2;
+    g.stamp(leafy([[8, cy, 5, h / 2], [4, cy + 1, 3.5, 3], [12, cy + 1, 3.5, 3], [8, cy - h / 3, 3, 2.5]], GREEN, seed));
+    return g;
+  };
+  const s2 = bush(7, 1501);
+  const budding = bush(11, 1502);
+  for (const [x, y] of [
+    [5, 10],
+    [9, 9],
+    [11, 13],
+    [7, 14],
+  ])
+    budding.set(x, y, 'mist');
+  const bloom = bush(11, 1502);
+  for (const [x, y] of [
+    [4, 11],
+    [8, 8],
+    [11, 10],
+    [6, 14],
+    [10, 15],
+    [13, 13],
+    [7, 11],
+  ])
+    bloom.set(x, y, 'gold').set(x - 1, y, 'cream').set(x + 1, y, 'cream').set(x, y - 1, 'cream').set(x, y + 1, 'mist');
+  return [seeded('mist', 'cream', 'haze'), finish(sprout), finish(s2), finish(budding), finish(bloom)];
 }
 
 const CROP_ART: Record<string, () => PixelGrid[]> = {
@@ -625,6 +857,9 @@ const CROP_ART: Record<string, () => PixelGrid[]> = {
   jagung: jagungFrames,
   cabai: cabaiFrames,
   terong: terongFrames,
+  matahari: matahariFrames,
+  mawar: mawarFrames,
+  melati: melatiFrames,
 };
 
 // ---------------------------------------------------------------------------
