@@ -34,7 +34,7 @@ export const DOG_ROOM_MAP: MapDef = {
   decor: { flowers: 0, tufts: 0, pebbles: 0, meadow: 0, reeds: 0, lilies: 0 },
   music: { morning: 'dog-dance', day: 'dog-dance', evening: 'dog-dance', night: 'dog-dance' },
   ambience: {},
-  backdrop: 'cream',
+  backdrop: 'ink',
   leaves: false,
   indoor: true,
   interiorStyle: 'paper',

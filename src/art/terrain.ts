@@ -528,10 +528,10 @@ function interiorTiles(): PixelGrid[] {
     ...floors('wood'),
     ...wallTiles(['haze', 'mist', 'cream'], ['bark', 'clay', 'tan']),
     v,
-    // Paper: an all-white doodle room (the void is white too).
+    // Paper: an all-white doodle room floating in black.
     ...floors('paper'),
     ...paperWalls(),
-    new PixelGrid(T, T).fillRect(0, 0, T, T, 'cream'),
+    v,
     // Gallery: deep red walls, dark wood dado, marble floor.
     ...floors('marble'),
     ...wallTiles(['wine', 'brick', 'coral'], ['bark', 'umber', 'gold'], ['night', 'plum']),
