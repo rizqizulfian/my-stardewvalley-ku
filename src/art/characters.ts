@@ -28,11 +28,12 @@ export interface CharacterLook {
   hat?: { style: 'caping' | 'peci' | 'hijab'; ramp: readonly [ColorName, ColorName, ColorName, ColorName] };
 }
 
-/** Frame layout of every character sheet: per facing, 2 idle frames then 4 walk frames. */
+/** Frame layout of every character sheet: per facing, 2 idle, 4 walk, then 2 tool-use poses (wind-up, strike). */
 export const CHAR_FRAMES = {
-  perFacing: 6,
+  perFacing: 8,
   idle: [0, 1],
   walk: [2, 3, 4, 5],
+  use: [6, 7],
 } as const;
 
 export function charFrame(facing: Facing, n: number): number {
@@ -329,6 +330,22 @@ function upperBody(view: View, look: CharacterLook, legend: Legend): PixelGrid {
   return g;
 }
 
+/**
+ * Tool-use pose: the arms are lifted off the torso (the tool sprite draws the
+ * hands on the handle). Side views keep their near arm.
+ */
+function armless(g: PixelGrid, view: View, legend: Legend): PixelGrid {
+  if (view === 'side') return g;
+  const out = g.clone();
+  const top = DOWN_HEAD.length;
+  const edge = legend.a as ColorName;
+  for (let y = top; y < g.h; y++) {
+    for (const x of [2, 3, 12, 13]) out.set(x, y, null);
+    for (const x of [4, 11]) if (out.filled(x, y)) out.set(x, y, edge);
+  }
+  return out;
+}
+
 function legs(view: View, pose: 'idle' | 'stepA' | 'stepB', legend: Legend): PixelGrid {
   const set = view === 'side' ? SIDE_LEGS : FRONT_LEGS;
   return PixelGrid.fromRows(set[pose], legend, `legs-${view}-${pose}`);
@@ -357,6 +374,8 @@ export function buildCharacterFrames(look: CharacterLook): PixelGrid[] {
       compose(up, legs(view, 'idle', legend), 0),
       compose(up, legs(view, 'stepB', legend), 1),
       compose(up, legs(view, 'idle', legend), 0),
+      compose(armless(up, view, legend), legs(view, 'idle', legend), 0),
+      compose(armless(up, view, legend), legs(view, 'idle', legend), 1),
     ];
     frames.push(...(facing === 'left' ? set.map((f) => f.flipX()) : set));
   }

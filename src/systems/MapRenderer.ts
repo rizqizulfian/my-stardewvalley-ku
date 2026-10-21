@@ -18,7 +18,7 @@ import {
 } from '../art/terrain';
 import { FLOWER_VARIANTS, PEBBLE_VARIANTS, PROP_TEXTURES } from '../art/props';
 import { TERRAIN } from '../data/terrain';
-import type { WorldMap } from './WorldMap';
+import type { PlacedProp, WorldMap } from './WorldMap';
 
 const T = RENDER.tileSize;
 const HALF = T / 2;
@@ -38,12 +38,27 @@ export interface NightLight {
   flicker: number;
 }
 
+/** The display objects that belong to one placed prop. */
+export interface PropView {
+  sprite: Phaser.GameObjects.Sprite;
+  /** Everything else: shadow, emissive overlay, lights. */
+  extras: Phaser.GameObjects.GameObject[];
+  baseX: number;
+}
+
 export interface RenderedMap {
   swayers: Swayer[];
   emissives: Phaser.GameObjects.Image[];
   lights: NightLight[];
   /** Tree sprites, used to spawn falling leaves. */
   trees: Phaser.GameObjects.Sprite[];
+  propViews: Map<PlacedProp, PropView>;
+  /** Removes a cleared prop's sprites. */
+  removeProp(p: PlacedProp): void;
+  /** Removes flowers, tufts and pebbles from a cell (e.g. when it is tilled). */
+  clearDecor(cx: number, cy: number): void;
+  /** A short sideways shake, for tool hits. */
+  shakeProp(p: PlacedProp, strength?: number): void;
   update(timeMs: number): void;
   destroy(): void;
 }
@@ -52,7 +67,8 @@ export function worldDepth(bottomY: number): number {
   return DEPTH.worldBase + bottomY;
 }
 
-export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
+/** `bare` cells get no scattered decor (tilled soil). */
+export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number, cy: number) => boolean = () => false): RenderedMap {
   const objects: Phaser.GameObjects.GameObject[] = [];
   const tm = scene.make.tilemap({ tileWidth: T, tileHeight: T, width: map.w + 1, height: map.h + 1 });
   const ts = {
@@ -158,6 +174,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
   const emissives: Phaser.GameObjects.Image[] = [];
   const lights: NightLight[] = [];
   const trees: Phaser.GameObjects.Sprite[] = [];
+  const propViews = new Map<PlacedProp, PropView>();
   for (const p of map.props) {
     const d = p.def;
     const jitter = d.jitter ? Math.round((hash2(p.cx, p.cy, seed + 3) - 0.5) * 2 * d.jitter) : 0;
@@ -167,10 +184,13 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
     const s = scene.add.sprite(x, y, d.texture, frame).setOrigin(0.5, 1);
     s.setDepth(d.flat ? DEPTH.groundDecor : worldDepth(y));
     objects.push(s);
+    const view: PropView = { sprite: s, extras: [], baseX: x };
+    propViews.set(p, view);
     if (d.shadow) {
       const sh = scene.add.image(x, y - 1 + (d.shadowOffsetY ?? 0), d.shadow).setOrigin(0.5, 0.5).setAlpha(0.35);
       sh.setDepth(DEPTH.groundDecor + 0.5);
       objects.push(sh);
+      view.extras.push(sh);
     }
     if (d.sway) {
       swayers.push({ sprite: s, x, slow: d.texture.includes('tree') });
@@ -180,6 +200,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
       const e = scene.add.image(x, y, d.emissive).setOrigin(0.5, 1).setDepth(s.depth + 0.01).setVisible(false);
       emissives.push(e);
       objects.push(e);
+      view.extras.push(e);
     }
     for (const l of d.lights ?? []) {
       const img = scene.add
@@ -190,8 +211,19 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
         .setScale(l.scale ?? 1);
       lights.push({ image: img, baseScale: l.scale ?? 1, flicker: hash2(p.cx, p.cy, 99) * 10 });
       objects.push(img);
+      view.extras.push(img);
     }
   }
+
+  // Decor per cell, so tilling can clear it.
+  const decorCells = new Map<number, Phaser.GameObjects.GameObject[]>();
+  const addDecor = (x: number, y: number, o: Phaser.GameObjects.GameObject) => {
+    objects.push(o);
+    const k = map.index(x, y);
+    const list = decorCells.get(k);
+    if (list) list.push(o);
+    else decorCells.set(k, [o]);
+  };
 
   // Scattered decor on open grass.
   const dec = map.def.decor;
@@ -219,10 +251,10 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
         const ry = y * T + T - 2 + wy;
         const s = scene.add.sprite(rx, ry, PROP_TEXTURES.reeds, 1).setOrigin(0.5, 1).setDepth(worldDepth(ry));
         swayers.push({ sprite: s, x: rx, slow: false });
-        objects.push(s);
+        addDecor(x, y, s);
         continue;
       }
-      if (!t.decor || map.occupied.has(map.index(x, y))) continue;
+      if (!t.decor || map.occupied.has(map.index(x, y)) || bare(x, y)) continue;
       // Keep a little space around cliffs.
       if (TERRAIN[map.kindAt(x, y - 1)].cliff) continue;
       const r = hash2(x, y, seed + 21);
@@ -230,15 +262,15 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
       const py = y * T + 4 + Math.floor(hash2(x, y, seed + 23) * (T - 6));
       if (r < dec.flowers) {
         const f = Math.floor(hash2(x, y, seed + 24) * FLOWER_VARIANTS);
-        objects.push(scene.add.image(px, py, PROP_TEXTURES.flowers, f).setDepth(DEPTH.groundDecor));
+        addDecor(x, y, scene.add.image(px, py, PROP_TEXTURES.flowers, f).setDepth(DEPTH.groundDecor));
       } else if (r < dec.flowers + dec.tufts) {
         const s = scene.add.sprite(px, py + 4, PROP_TEXTURES.tuft, 1).setOrigin(0.5, 1);
         s.setDepth(worldDepth(py + 1));
         swayers.push({ sprite: s, x: px, slow: false });
-        objects.push(s);
+        addDecor(x, y, s);
       } else if (r < dec.flowers + dec.tufts + dec.pebbles) {
         const f = Math.floor(hash2(x, y, seed + 25) * PEBBLE_VARIANTS);
-        objects.push(scene.add.image(px, py, PROP_TEXTURES.pebbles, f).setDepth(DEPTH.groundDecor));
+        addDecor(x, y, scene.add.image(px, py, PROP_TEXTURES.pebbles, f).setDepth(DEPTH.groundDecor));
       }
     }
 
@@ -247,11 +279,55 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap): RenderedMap {
   let nextWater = 0;
   let nextSway = 0;
 
+  const dropSprite = (o: Phaser.GameObjects.GameObject) => {
+    const si = swayers.findIndex((w) => w.sprite === o);
+    if (si >= 0) swayers.splice(si, 1);
+    const ti = trees.indexOf(o as Phaser.GameObjects.Sprite);
+    if (ti >= 0) trees.splice(ti, 1);
+    const ei = emissives.indexOf(o as Phaser.GameObjects.Image);
+    if (ei >= 0) emissives.splice(ei, 1);
+    const li = lights.findIndex((l) => l.image === o);
+    if (li >= 0) lights.splice(li, 1);
+    const oi = objects.indexOf(o);
+    if (oi >= 0) objects.splice(oi, 1);
+    o.destroy();
+  };
+
   return {
     swayers,
     emissives,
     lights,
     trees,
+    propViews,
+    removeProp(p: PlacedProp) {
+      const v = propViews.get(p);
+      if (!v) return;
+      propViews.delete(p);
+      scene.tweens.killTweensOf(v.sprite);
+      dropSprite(v.sprite);
+      v.extras.forEach(dropSprite);
+    },
+    clearDecor(cx: number, cy: number) {
+      const k = map.index(cx, cy);
+      decorCells.get(k)?.forEach(dropSprite);
+      decorCells.delete(k);
+    },
+    shakeProp(p: PlacedProp, strength = 1) {
+      const v = propViews.get(p);
+      if (!v) return;
+      scene.tweens.killTweensOf(v.sprite);
+      v.sprite.x = v.baseX;
+      // Whole-pixel steps keep the art crisp.
+      const steps = [strength, -strength, Math.ceil(strength / 2), 0];
+      let i = 0;
+      scene.time.addEvent({
+        delay: 45,
+        repeat: steps.length - 1,
+        callback: () => {
+          if (v.sprite.active) v.sprite.x = v.baseX + steps[i++];
+        },
+      });
+    },
     update(timeMs: number) {
       if (timeMs >= nextWater) {
         nextWater = timeMs + ATMOSPHERE.waterFrameMs;

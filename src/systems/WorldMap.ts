@@ -16,6 +16,8 @@ export interface PlacedProp {
   cy: number;
   /** Fence connection mask, if the prop connects. */
   connections: number;
+  /** Index into WorldMap.colliders, or -1. */
+  collider: number;
 }
 
 export class WorldMap {
@@ -28,8 +30,14 @@ export class WorldMap {
   private readonly colliderCells = new Map<number, number[]>();
   /** Cells covered by a prop footprint (no decor there). */
   readonly occupied = new Set<number>();
+  /** Cell index -> the prop whose footprint covers it. */
+  private readonly propCells = new Map<number, PlacedProp>();
 
-  constructor(readonly def: MapDef) {
+  /** `removed` lists anchor cells of props cleared earlier (they are skipped). */
+  constructor(
+    readonly def: MapDef,
+    private readonly removed: ReadonlySet<number> = new Set(),
+  ) {
     this.h = def.terrain.length;
     this.w = def.terrain[0].length;
     const legend = { ...TERRAIN_LEGEND, ...(def.terrainLegend ?? {}) };
@@ -58,24 +66,29 @@ export class WorldMap {
         const id = legend[ch];
         const def = id ? PROPS[id] : undefined;
         if (!def) throw new Error(`[map ${this.def.id}] unknown prop '${ch}' at ${x},${y}`);
+        if (this.removed.has(this.index(x, y))) continue;
         let connections = 0;
         if (def.connects) {
           const same = (dx: number, dy: number) => at(x + dx, y + dy) === ch;
           connections = (same(0, -1) ? 1 : 0) | (same(1, 0) ? 2 : 0) | (same(0, 1) ? 4 : 0) | (same(-1, 0) ? 8 : 0);
         }
-        this.props.push({ id, def, cx: x, cy: y, connections });
+        const placed: PlacedProp = { id, def, cx: x, cy: y, connections, collider: -1 };
+        this.props.push(placed);
         for (let j = 0; j < def.footprint.h; j++)
-          for (let i = 0; i < def.footprint.w; i++) this.occupied.add(this.index(x + i, y - j));
+          for (let i = 0; i < def.footprint.w; i++) {
+            this.occupied.add(this.index(x + i, y - j));
+            this.propCells.set(this.index(x + i, y - j), placed);
+          }
         if (def.collider) {
           const left = x * T;
           const top = (y - def.footprint.h + 1) * T;
-          this.addCollider({ x: left + def.collider.x, y: top + def.collider.y, w: def.collider.w, h: def.collider.h });
+          placed.collider = this.addCollider({ x: left + def.collider.x, y: top + def.collider.y, w: def.collider.w, h: def.collider.h });
         }
       }
     }
   }
 
-  private addCollider(b: Box): void {
+  private addCollider(b: Box): number {
     const i = this.colliders.length;
     this.colliders.push(b);
     for (let cy = Math.floor(b.y / T); cy <= Math.floor((b.y + b.h - 1) / T); cy++)
@@ -85,6 +98,30 @@ export class WorldMap {
         if (list) list.push(i);
         else this.colliderCells.set(k, [i]);
       }
+    return i;
+  }
+
+  propAt(cx: number, cy: number): PlacedProp | undefined {
+    return this.propCells.get(this.index(cx, cy));
+  }
+
+  /** Clears a prop from the map: footprint, collider and lookup. */
+  removeProp(p: PlacedProp): void {
+    const i = this.props.indexOf(p);
+    if (i >= 0) this.props.splice(i, 1);
+    for (let j = 0; j < p.def.footprint.h; j++)
+      for (let k = 0; k < p.def.footprint.w; k++) {
+        const c = this.index(p.cx + k, p.cy - j);
+        this.occupied.delete(c);
+        this.propCells.delete(c);
+      }
+    if (p.collider >= 0) this.colliders[p.collider] = { x: 0, y: 0, w: 0, h: 0 };
+  }
+
+  /** Can this cell be tilled (open ground, nothing standing on it)? */
+  canTill(cx: number, cy: number): boolean {
+    if (!this.def.tillable || !this.inBounds(cx, cy)) return false;
+    return this.kindAt(cx, cy) === 'grass' && !this.occupied.has(this.index(cx, cy));
   }
 
   index(x: number, y: number): number {

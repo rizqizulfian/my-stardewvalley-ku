@@ -5,6 +5,8 @@ import { audio } from './audio/AudioManager';
 import { BootScene } from './scenes/BootScene';
 import { UIScene } from './scenes/UIScene';
 import { WorldScene } from './scenes/WorldScene';
+import { EV, bus } from './systems/events';
+import { advanceFarms } from './systems/farming';
 import { state } from './systems/GameState';
 
 /** Whole-number zoom plus the native size that fills the window at that zoom. */
@@ -28,6 +30,12 @@ const game = new Phaser.Game({
   antialias: false,
   scale: { mode: Phaser.Scale.NONE },
   scene: [BootScene, WorldScene, UIScene],
+});
+
+// Overnight growth runs for every map, whichever one the player is on.
+bus.on(EV.newDay, () => {
+  advanceFarms(state);
+  bus.emit(EV.farmChanged);
 });
 
 window.addEventListener('resize', () => {

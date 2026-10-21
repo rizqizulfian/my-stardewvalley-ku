@@ -91,9 +91,40 @@ export const AUDIO = {
   storageKey: 'lembah-padi.audio',
 } as const;
 
+export const FARM = {
+  inventorySlots: 30,
+  hotbarSlots: 10,
+  /** Watering can capacity, in uses. */
+  canCapacity: 40,
+  /** Tool reach in cells around the player (mouse targeting). */
+  reach: 1,
+  /** How far ahead of the feet (px) the keyboard target point sits. */
+  facingReach: 12,
+} as const;
+
+/** Tool swing timing: milliseconds per frame, and the frame where the tool lands. */
+export const TOOL_TIMING = {
+  swing: { frames: [110, 70, 170], impact: 2 },
+  scythe: { frames: [70, 60, 140], impact: 1 },
+  can: { frames: [110, 220, 220], impact: 1 },
+} as const;
+
+export const DROPS = {
+  /** Pop-out arc of dropped items. */
+  popSpeed: 55,
+  gravity: 260,
+  /** Rest on the ground for this long before flying to the player (ms). */
+  restMs: 280,
+  /** Magnet flight speed (px/s) and pickup radius (px). */
+  magnetSpeed: 150,
+  pickupRadius: 6,
+} as const;
+
 export const DEBUG = {
   /** Hold this key to fast-forward the clock. */
   fastForwardKey: 'T',
+  /** Press to skip to the next morning. */
+  nextDayKey: 'N',
   showCollision: false,
 } as const;
 

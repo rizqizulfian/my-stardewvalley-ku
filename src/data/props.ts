@@ -2,6 +2,7 @@
 // marks the bottom-left cell of the prop's footprint.
 
 import { PROP_TEXTURES } from '../art/props';
+import type { ToolKind } from './items';
 import type { Surface } from './terrain';
 
 export interface Box {
@@ -17,6 +18,20 @@ export interface LightDef {
   y: number;
   texture: 'light-warm' | 'light-window';
   scale?: number;
+}
+
+/** How a prop reacts to tools. Props without this cannot be cleared. */
+export interface BreakableDef {
+  /** Tools that damage it. */
+  tools: ToolKind[];
+  hits: number;
+  /** [item id, min, max] dropped when it breaks. */
+  drops: Array<[string, number, number]>;
+  /** Sound per hit and when it breaks. */
+  hitSfx: string;
+  breakSfx: string;
+  /** Particle bit frame (see art/items BIT). */
+  bit: 'chip' | 'pebble' | 'leaf';
 }
 
 export interface PropDef {
@@ -44,11 +59,15 @@ export interface PropDef {
   surface?: Surface;
   /** Small horizontal jitter, in pixels, so rows of trees do not look gridded. */
   jitter?: number;
+  breakable?: BreakableDef;
+  /** Trees shake and drop leaves when hit with an axe, but stay. */
+  shakes?: boolean;
 }
 
 export const PROPS: Record<string, PropDef> = {
   treeRound: {
     texture: PROP_TEXTURES.treeRound,
+    shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 3, y: 9, w: 10, h: 6 },
     offsetY: 1,
@@ -59,6 +78,7 @@ export const PROPS: Record<string, PropDef> = {
   },
   treeFruit: {
     texture: PROP_TEXTURES.treeFruit,
+    shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 3, y: 9, w: 10, h: 6 },
     offsetY: 1,
@@ -69,6 +89,7 @@ export const PROPS: Record<string, PropDef> = {
   },
   treeSlender: {
     texture: PROP_TEXTURES.treeSlender,
+    shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 4, y: 10, w: 8, h: 5 },
     offsetY: 1,
@@ -99,6 +120,7 @@ export const PROPS: Record<string, PropDef> = {
     collider: { x: 2, y: 5, w: 12, h: 9 },
     shadow: PROP_TEXTURES.shadowS,
     jitter: 1,
+    breakable: { tools: ['pickaxe'], hits: 2, drops: [['stone', 1, 3]], hitSfx: 'clink', breakSfx: 'crumble', bit: 'pebble' },
   },
   boulder: {
     texture: PROP_TEXTURES.boulder,
@@ -106,30 +128,35 @@ export const PROPS: Record<string, PropDef> = {
     collider: { x: 2, y: 10, w: 28, h: 20 },
     offsetY: 1,
     shadow: PROP_TEXTURES.shadowL,
+    breakable: { tools: ['pickaxe'], hits: 8, drops: [['stone', 8, 12]], hitSfx: 'clink', breakSfx: 'crumble', bit: 'pebble' },
   },
   stump: {
     texture: PROP_TEXTURES.stump,
     footprint: { w: 1, h: 1 },
     collider: { x: 2, y: 5, w: 12, h: 10 },
     shadow: PROP_TEXTURES.shadowS,
+    breakable: { tools: ['axe'], hits: 4, drops: [['wood', 4, 6]], hitSfx: 'chop', breakSfx: 'woodBreak', bit: 'chip' },
   },
   weeds: {
     texture: PROP_TEXTURES.weeds,
     footprint: { w: 1, h: 1 },
     sway: true,
     jitter: 1,
+    breakable: { tools: ['scythe', 'hoe', 'axe', 'pickaxe'], hits: 1, drops: [['fiber', 0, 1]], hitSfx: 'rustle', breakSfx: 'rustle', bit: 'leaf' },
   },
   branch: {
     texture: PROP_TEXTURES.branch,
     footprint: { w: 1, h: 1 },
     flat: true,
     jitter: 1,
+    breakable: { tools: ['axe'], hits: 1, drops: [['wood', 1, 2]], hitSfx: 'chop', breakSfx: 'chop', bit: 'chip' },
   },
   log: {
     texture: PROP_TEXTURES.log,
     footprint: { w: 2, h: 1 },
     collider: { x: 1, y: 4, w: 30, h: 10 },
     shadow: PROP_TEXTURES.shadowL,
+    breakable: { tools: ['axe'], hits: 6, drops: [['wood', 8, 10]], hitSfx: 'chop', breakSfx: 'woodBreak', bit: 'chip' },
   },
   fence: {
     texture: PROP_TEXTURES.fence,

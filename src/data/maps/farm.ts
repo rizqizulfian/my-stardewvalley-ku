@@ -90,4 +90,5 @@ export const FARM_MAP: MapDef = {
   ambience: { birds: 1, wind: 0.7, crickets: 1, water: 0.5 },
   backdrop: 'pine',
   leaves: true,
+  tillable: true,
 };

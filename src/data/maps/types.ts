@@ -35,4 +35,6 @@ export interface MapDef {
   backdrop: ColorName;
   /** Falling leaves near trees. */
   leaves: boolean;
+  /** Open grass here can be tilled for crops. */
+  tillable?: boolean;
 }
