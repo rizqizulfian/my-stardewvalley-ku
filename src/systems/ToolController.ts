@@ -13,6 +13,7 @@ import { TERRAIN, isWaterTerrain } from '../data/terrain';
 import type { ActionSpec, Player } from '../entities/Player';
 import type { Effects } from './Effects';
 import { EV, bus } from './events';
+import { hint } from './hints';
 import { harvest, isRipe, plant, soilOf, till, water } from './farming';
 import type { FarmView } from './FarmView';
 import type { GameState } from './GameState';
@@ -22,6 +23,15 @@ import type { RenderedMap } from './MapRenderer';
 import type { PlacedProp, WorldMap } from './WorldMap';
 
 const T = RENDER.tileSize;
+
+const TOOL_NAMES: Record<ToolKind, string> = {
+  hoe: 'Hoe',
+  can: 'Watering Can',
+  axe: 'Axe',
+  pickaxe: 'Pickaxe',
+  scythe: 'Scythe',
+  rod: 'Fishing Rod',
+};
 
 interface Target {
   cx: number;
@@ -149,7 +159,59 @@ export class ToolController {
     if (def.food) return this.eat();
     if (def.kind !== 'tool' || !def.tool) return false;
     if (def.tool === 'rod') return this.onCast();
+    const wrong = this.wrongToolHint(def.tool, cx, cy);
+    if (wrong) {
+      hint(wrong);
+      return false;
+    }
     return this.swing(def.tool, cx, cy);
+  }
+
+  /**
+   * When the tool clearly can't do anything to the target, the line telling the
+   * player what would. Null lets the swing go ahead as before.
+   */
+  private wrongToolHint(tool: ToolKind, cx: number, cy: number): string | null {
+    if (!this.map.inBounds(cx, cy)) return null;
+    const prop = this.map.propAt(cx, cy);
+    if (prop) {
+      const d = prop.def;
+      if (d.breakable?.tools.includes(tool) || (tool === 'axe' && d.shakes)) return null;
+      if (tool === 'can' && d.use === 'well') return null;
+      if (tool === 'scythe') return null; // the sweep may still catch the cells either side
+      if (d.shakes) return `Use the ${TOOL_NAMES.axe} on trees.`;
+      const b = d.breakable;
+      if (b) {
+        const need = b.tools.includes('scythe') ? 'scythe' : b.tools[0];
+        if (need === 'pickaxe') return `Use the ${TOOL_NAMES.pickaxe} to break rocks.`;
+        if (need === 'axe') return `Use the ${TOOL_NAMES.axe} to chop wood.`;
+        if (need === 'scythe') return `Use the ${TOOL_NAMES.scythe} to cut weeds.`;
+        return `Use the ${TOOL_NAMES[need]} here.`;
+      }
+      if (d.use) return `The ${TOOL_NAMES[tool]} won't help here. Press the action button.`;
+      return null;
+    }
+    const soil = this.soilAt(cx, cy);
+    switch (tool) {
+      case 'hoe':
+        if (soil) return soil.crop ? 'Something is already growing here.' : 'Already tilled. Plant some seeds!';
+        if (this.isWater(cx, cy)) return `Fill the ${TOOL_NAMES.can} at the water.`;
+        if (!this.map.def.tillable) return 'You can only till soil on your farm.';
+        if (!this.map.canTill(cx, cy)) return 'Only grassy ground can be tilled.';
+        return null;
+      case 'can':
+        if (this.isWater(cx, cy)) return null;
+        if (this.state.water <= 0) return null; // the empty-can message covers it
+        if (!soil) return `Till the soil with the ${TOOL_NAMES.hoe} first, then water it.`;
+        if (soil.wet) return 'Already watered today.';
+        return null;
+      case 'axe':
+      case 'pickaxe':
+        if (soil?.crop) return 'Careful, that crop is still growing!';
+        return null;
+      default:
+        return null;
+    }
   }
 
   /** The action button: pick a ripe crop, or use the prop in front (bed, bench, shop...). */
@@ -229,13 +291,19 @@ export class ToolController {
 
   private plantAt(cx: number, cy: number, crop: string): boolean {
     const soil = this.soilAt(cx, cy);
-    if (!soil || soil.crop || !CROPS[crop]) {
-      audio.playSfx('bonk', 0.5);
+    if (!CROPS[crop] || !this.map.inBounds(cx, cy)) return false;
+    if (!soil) {
+      if (this.map.propAt(cx, cy) || this.isWater(cx, cy)) hint('Seeds go in tilled soil.');
+      else if (!this.map.def.tillable) hint('Plant seeds in tilled soil on your farm.');
+      else hint(`Till the soil with the ${TOOL_NAMES.hoe} first, then plant.`);
+      return false;
+    }
+    if (soil.crop) {
+      hint('Something is already growing here.');
       return false;
     }
     if (!inSeason(CROPS[crop], this.state.season)) {
-      audio.playSfx('bonk', 0.5);
-      bus.emit(EV.notice, `${CROPS[crop].name} won't grow in ${SEASONS[this.state.season]}.`);
+      hint(`${CROPS[crop].name} won't grow in ${SEASONS[this.state.season]}.`);
       return false;
     }
     return this.player.act({
