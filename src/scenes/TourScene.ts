@@ -67,7 +67,13 @@ export class TourScene extends Phaser.Scene {
     this.card.add([this.box, this.title, this.caption]);
     this.counter = new PixelText(this, 0, 0, '', { color: 'cream', outline: 'night' });
     this.skip = new PixelText(this, 0, 0, 'Esc  skip >>', { color: 'cream', outline: 'night' });
-    this.skip.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+    // A roomy hit area: the label itself is tiny under a finger.
+    const pad = 10;
+    this.skip.setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-pad, -pad, this.skip.width + pad * 2, this.skip.height + pad * 2),
+      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      useHandCursor: true,
+    }).on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
       e.stopPropagation();
       this.finish();
     });
@@ -93,9 +99,9 @@ export class TourScene extends Phaser.Scene {
     this.caption.setStyle({ wrapWidth: cw - CARD.pad * 2 });
     this.fitCard(cw);
     this.card.setPosition(Math.round((w - cw) / 2), h - this.box.height - CARD.margin);
-    // Top left, clear of the clock in the other corner.
-    this.counter.setPosition(6, 6);
-    this.skip.setPosition(6, 18);
+    // Top middle, clear of the clock (right) and the phone Menu button (left).
+    this.counter.setPosition(Math.round((w - this.counter.width) / 2), 6);
+    this.skip.setPosition(Math.round((w - this.skip.width) / 2), 18);
   }
 
   private fitCard(cw: number): void {
@@ -111,6 +117,7 @@ export class TourScene extends Phaser.Scene {
     this.fitCard(cw);
     this.card.setPosition(Math.round((w - cw) / 2), h - this.box.height - CARD.margin);
     this.counter.setText(count);
+    this.counter.x = Math.round((w - this.counter.width) / 2);
   }
 
   /** Fade the world out, run `between` while it is black, and fade the card back in. */
