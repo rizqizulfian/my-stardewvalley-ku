@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEBUG, GAME_TITLE } from '../config';
 import type { DaySummary } from '../systems/day';
 import { audio } from '../audio/AudioManager';
+import { OPENING_TRACK } from '../data/music';
 import { EV, bus } from '../systems/events';
 import { newGameState, state } from '../systems/GameState';
 import { clearSave, hasSave } from '../systems/save';
@@ -16,6 +17,7 @@ import { ShopMenu } from '../ui/ShopMenu';
 import { Hotbar } from '../ui/Hotbar';
 import { InventoryMenu } from '../ui/InventoryMenu';
 import { addPanel } from '../ui/Panel';
+import { TOUCH_TOP_ROW, shouldShow } from '../ui/TouchControls';
 import { PixelText } from '../ui/PixelText';
 import { Notice, Toasts } from '../ui/Toasts';
 import type { IntroData } from './IntroScene';
@@ -29,11 +31,19 @@ const PROMPT = {
 } as const;
 
 /** Controls reminder in the top-left; fades after a while, H brings it back. */
+const touch = shouldShow();
+
 const HELP = {
   lines: [
     'WASD walk   Click/Space use tool, eat, reel   X/Right-click pick, talk, sit, read',
     '1-0 or wheel: choose item   E backpack   M mute   Esc settings',
     `hold ${DEBUG.fastForwardKey} fast time   ${DEBUG.nextDayKey} next day   H hide help`,
+  ],
+  /** The same reminder for the on-screen phone controls. */
+  touchLines: [
+    'Stick walk   PAKAI use tool, eat, reel',
+    'AKSI pick, talk, sit, read',
+    'Tap item to choose   TAS backpack   MENU settings',
   ],
   showMs: 25000,
 } as const;
@@ -74,7 +84,7 @@ export class UIScene extends Phaser.Scene {
     this.needs = new NeedsPanel(this);
     this.needs.setVisible(false);
 
-    this.help = new PixelText(this, 4, 4, HELP.lines.join('\n'), { color: 'cream', outline: 'night' }).setAlpha(0.9).setVisible(false);
+    this.help = new PixelText(this, 4, 4, (touch ? HELP.touchLines : HELP.lines).join('\n'), { color: 'cream', outline: 'night' }).setAlpha(0.9).setVisible(false);
 
     this.hotbar = new Hotbar(this, (i) => {
       if (uiState.menuOpen) return;
@@ -198,6 +208,8 @@ export class UIScene extends Phaser.Scene {
       this.notice.layout(this.scale.width, hb.y - 24);
       this.toasts.layout(this.scale.height);
       this.menu.layout(this.scale.width, this.scale.height);
+      // Below the on-screen Menu/Tas buttons on phones.
+      this.help.y = touch ? Math.ceil(TOUCH_TOP_ROW / this.scale.zoom) : 4;
       if (this.prompt) this.centerPrompt(this.prompt);
     };
     relayout();
@@ -288,6 +300,7 @@ export class UIScene extends Phaser.Scene {
       if (begun || this.dialog.isOpen) return;
       begun = true;
       blink.remove();
+      audio.startOpening(OPENING_TRACK);
       void audio.unlock().then(() => audio.playSfx('start', 0.8));
       if (state.introSeen) this.startPlaying();
       else this.playIntro();
