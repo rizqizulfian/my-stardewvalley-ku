@@ -1,6 +1,7 @@
 // Places the day's forage. Runs once per day, the first time a map is shown
 // after waking (and on a new game).
 
+import { ANIMALS } from '../data/animals';
 import { FORAGE } from '../data/forage';
 import { MAPS } from '../data/maps';
 import type { GameState } from './GameState';
@@ -45,5 +46,19 @@ export function ensureForage(s: GameState, rand: () => number = Math.random): vo
       if (id) spots.push({ x, y, id });
     }
     s.forage[mapId] = spots;
+  }
+  // Hens and ducks lay one egg each somewhere in their run.
+  const maps: Record<string, WorldMap> = {};
+  for (const a of ANIMALS) {
+    if (!a.lays || !MAPS[a.map]) continue;
+    const map = (maps[a.map] ??= new WorldMap(MAPS[a.map], new Set(s.removed[a.map] ?? [])));
+    const spots = (s.forage[a.map] ??= []);
+    for (let tries = 0; tries < 30; tries++) {
+      const x = a.area.x0 + Math.floor(rand() * (a.area.x1 - a.area.x0 + 1));
+      const y = a.area.y0 + Math.floor(rand() * (a.area.y1 - a.area.y0 + 1));
+      if (!map.terrainAt(x, y).walkable || map.occupied.has(map.index(x, y)) || spots.some((p) => p.x === x && p.y === y)) continue;
+      spots.push({ x, y, id: a.lays });
+      break;
+    }
   }
 }

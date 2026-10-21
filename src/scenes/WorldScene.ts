@@ -13,6 +13,7 @@ import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
 import { DOG_BEAT_MS, DogDance } from '../entities/DogDance';
 import { Player } from '../entities/Player';
+import { AnimalSystem } from '../systems/AnimalSystem';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
 import { Fishing } from '../systems/Fishing';
@@ -78,6 +79,7 @@ export class WorldScene extends Phaser.Scene {
   private fx!: Effects;
   private tools!: ToolController;
   private npcs!: NpcSystem;
+  private animals!: AnimalSystem;
   private fishing!: Fishing;
   private gather!: Gathering;
   private weather!: Weather;
@@ -125,7 +127,8 @@ export class WorldScene extends Phaser.Scene {
     this.tools = new ToolController(this, state, this.map, this.rendered, this.farm, this.player, this.fx);
     this.npcs = new NpcSystem(this, this.map, state, this.fx);
     this.dog = this.def.dancer ? new DogDance(this, this.def.dancer) : null;
-    this.player.blocked = (b) => this.npcs.blocked(b) || !!this.dog?.blocks(b);
+    this.animals = new AnimalSystem(this, this.map, state, this.fx);
+    this.player.blocked = (b) => this.npcs.blocked(b) || this.animals.blocked(b) || !!this.dog?.blocks(b);
     this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
     ensureForage(state);
     this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
@@ -142,6 +145,12 @@ export class WorldScene extends Phaser.Scene {
     this.tools.onTalk = (px, py) => {
       if (this.dog && this.dog.distanceTo(px, py) < 24) return this.talkToDog();
       const n = this.npcs.at(px, py);
+      const a = this.animals.at(px, py);
+      if (a && (!n || a.distanceTo(px, py) < Math.hypot(px - n.x, py - n.y + 6))) {
+        this.player.face(a.x, a.y - 4);
+        this.animals.pet(a, this.player.x);
+        return true;
+      }
       if (!n) return false;
       this.player.face(n.x, n.y - 6);
       this.npcs.talk(n, this.player.x, this.player.y, { openShop: (id) => this.openShop(id) });
@@ -217,6 +226,7 @@ export class WorldScene extends Phaser.Scene {
       this.dog = null;
       this.mailFlag = null;
       this.npcs.destroy();
+      this.animals.destroy();
       this.fx.destroy();
       this.tools.destroy();
       this.farm.destroy();
@@ -504,6 +514,7 @@ export class WorldScene extends Phaser.Scene {
     }
     if (!uiState.menuOpen) this.fishing.update(delta);
     this.npcs.update(delta, this.player.x, this.player.y, this.player.feet());
+    this.animals.update(delta, this.player.x, this.player.y, this.player.feet());
     this.dog?.update(delta, (x, y) => this.npcs.note(x, y));
     this.fx.update(delta, this.player.x, this.player.y);
     if (time > this.nextSparkle) {

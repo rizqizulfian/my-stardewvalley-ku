@@ -39,6 +39,40 @@ function thump(ctx: BaseAudioContext, dest: AudioNode, t: number, hz: number, to
   o.stop(t + dur + 0.02);
 }
 
+/** A pitched animal-ish voice: a gliding oscillator through a formant filter, with optional wobble. */
+function call(
+  ctx: BaseAudioContext,
+  dest: AudioNode,
+  t: number,
+  o: { type: OscillatorType; pitch: number[]; dur: number; gain: number; formant: number; q?: number; wobble?: [hz: number, depth: number] },
+): void {
+  const osc = ctx.createOscillator();
+  osc.type = o.type;
+  osc.frequency.setValueAtTime(o.pitch[0], t);
+  o.pitch.slice(1).forEach((hz, i) => osc.frequency.linearRampToValueAtTime(hz, t + (o.dur * (i + 1)) / (o.pitch.length - 1)));
+  if (o.wobble) {
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = o.wobble[0];
+    depth.gain.value = o.wobble[1];
+    lfo.connect(depth).connect(osc.frequency);
+    lfo.start(t);
+    lfo.stop(t + o.dur + 0.05);
+  }
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = o.formant;
+  f.Q.value = o.q ?? 1.5;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(o.gain, t + Math.min(0.04, o.dur / 4));
+  g.gain.setValueAtTime(o.gain, t + o.dur * 0.7);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+  osc.connect(f).connect(g).connect(dest);
+  osc.start(t);
+  osc.stop(t + o.dur + 0.05);
+}
+
 export const FOOTSTEPS: Record<Surface, SfxFn> = {
   grass: (ctx, d, t, p) => {
     burst(ctx, d, t, { type: 'bandpass', freq: 2600 * p, q: 0.8, dur: 0.07, gain: 0.07, attack: 0.008 });
@@ -276,6 +310,24 @@ export const SFX: Record<string, SfxFn> = {
   thunder: (ctx, d, t, p) => {
     burst(ctx, d, t, { type: 'lowpass', freq: 380 * p, q: 0.6, dur: 2.4, gain: 0.22, attack: 0.08, sweepTo: 90 * p });
     burst(ctx, d, t + 0.25, { type: 'lowpass', freq: 220 * p, q: 0.6, dur: 1.8, gain: 0.16, attack: 0.2 });
+  },
+  buzz: (ctx, d, t, p) => {
+    call(ctx, d, t, { type: 'sawtooth', pitch: [210 * p, 240 * p, 200 * p], dur: 0.7, gain: 0.05, formant: 900, q: 1, wobble: [28, 18] });
+  },
+  cluck: (ctx, d, t, p) => {
+    for (let i = 0; i < 3; i++) call(ctx, d, t + i * 0.11, { type: 'square', pitch: [620 * p, 440 * p], dur: 0.07, gain: 0.05, formant: 1300, q: 2 });
+  },
+  quack: (ctx, d, t, p) => {
+    for (let i = 0; i < 2; i++) call(ctx, d, t + i * 0.22, { type: 'sawtooth', pitch: [400 * p, 330 * p, 300 * p], dur: 0.17, gain: 0.07, formant: 1100, q: 3 });
+  },
+  meow: (ctx, d, t, p) => {
+    call(ctx, d, t, { type: 'sawtooth', pitch: [480 * p, 780 * p, 700 * p, 420 * p], dur: 0.55, gain: 0.05, formant: 1500, q: 2 });
+  },
+  baa: (ctx, d, t, p) => {
+    call(ctx, d, t, { type: 'sawtooth', pitch: [330 * p, 350 * p, 300 * p], dur: 0.65, gain: 0.06, formant: 950, q: 2, wobble: [8, 22] });
+  },
+  moo: (ctx, d, t, p) => {
+    call(ctx, d, t, { type: 'sawtooth', pitch: [130 * p, 150 * p, 135 * p, 100 * p], dur: 1.1, gain: 0.1, formant: 520, q: 1.2 });
   },
   whoosh: (ctx, d, t, p) => {
     burst(ctx, d, t, { type: 'bandpass', freq: 500 * p, q: 0.7, dur: 0.3, gain: 0.06, attack: 0.12, sweepTo: 1200 * p });

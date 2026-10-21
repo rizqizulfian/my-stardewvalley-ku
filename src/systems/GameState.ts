@@ -67,6 +67,10 @@ export interface GameState {
   /** Letters waiting in the mailbox (ids from data/mail.ts). */
   mail: string[];
   fishCaught: number;
+  /** Farm animals: daysPlayed of the last pet and of the last product given. */
+  animals: Record<string, { petted: number; gave: number }>;
+  /** The opening story has been shown. */
+  introSeen: boolean;
 }
 
 export type Weather = 'sun' | 'rain';
@@ -122,6 +126,8 @@ export function newGameState(): GameState {
     picked: {},
     mail: [],
     fishCaught: 0,
+    animals: {},
+    introSeen: false,
   };
 }
 

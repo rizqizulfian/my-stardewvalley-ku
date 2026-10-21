@@ -39,6 +39,8 @@ export function loadGame(): GameState | null {
     });
     s.shipped = (s.shipped ?? []).filter((l) => ITEMS[l.id]);
     if (!MAPS[s.mapId]) s.mapId = fresh.mapId;
+    // Saves from before the opening story already know the farm.
+    if (saved.introSeen === undefined) s.introSeen = true;
     return s;
   } catch (e) {
     console.warn('[save] could not load', e);

@@ -67,6 +67,11 @@ export const ICON_NAMES = [
   'mutiara',
   'jamur',
   'pakis',
+  'telur',
+  'telurBebek',
+  'susu',
+  'wol',
+  'madu',
 ] as const;
 
 export function iconFrame(name: string): number {
@@ -727,6 +732,51 @@ function fernIcon(): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
+function eggIcon(ramp: [ColorName, ColorName, ColorName, ColorName], speckle?: ColorName): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // A couple of eggs in a bit of straw.
+  g.line(2, 13, 13, 13, 'amber').line(3, 14, 12, 14, 'clay').set(1, 12, 'gold').set(14, 12, 'gold');
+  g.stamp(shade(blobMask(16, 16, [[6, 9, 3.4, 4.2]]), ramp, { rim: 0.35, gradient: 0.7 }));
+  g.stamp(shade(blobMask(16, 16, [[10.5, 10, 3.2, 3.8]]), ramp, { rim: 0.35, gradient: 0.7 }));
+  g.set(5, 7, 'cream').set(10, 8, 'cream');
+  if (speckle) g.set(7, 11, speckle).set(11, 12, speckle).set(9, 9, speckle);
+  return outline(g, { steps: 2 });
+}
+
+function milkIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // Glass bottle of milk with a blue cap.
+  g.stamp(shade(new PixelGrid(16, 16).fillRect(5, 6, 6, 9, 'ink').fillRect(6, 4, 4, 2, 'ink'), ['haze', 'mist', 'cream', 'cream'], { rim: 0.35 }));
+  g.fillRect(6, 2, 4, 2, 'sea').fillRect(6, 2, 4, 1, 'sky');
+  g.fillRect(5, 9, 6, 3, 'foam').fillRect(6, 10, 4, 1, 'sky');
+  g.set(6, 7, 'cream').set(6, 13, 'cream');
+  return outline(g, { steps: 2 });
+}
+
+function woolIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.stamp(shade(blobMask(16, 16, [[8, 9, 5.5, 5], [5, 7, 3, 3], [11, 7, 3, 3]]), ['haze', 'mist', 'cream', 'cream'], { rim: 0.3, noise: 0.3, seed: 17 }));
+  for (const [x, y] of [
+    [5, 8],
+    [9, 6],
+    [11, 10],
+    [7, 11],
+  ])
+    g.set(x, y, 'haze').set(x + 1, y, 'mist');
+  return outline(g, { steps: 2 });
+}
+
+function honeyIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // A jar of golden honey with a cloth lid and a drip.
+  g.stamp(shade(blobMask(16, 16, [[8, 10, 5, 4.6]]).fillRect(4, 6, 8, 4, 'ink'), ['clay', 'amber', 'gold', 'cream'], { rim: 0.35, gradient: 0.6 }));
+  g.fillRect(4, 3, 8, 3, 'brick').fillRect(4, 3, 8, 1, 'coral').set(5, 5, 'wine').set(10, 5, 'wine');
+  g.line(4, 6, 11, 6, 'umber');
+  g.set(6, 8, 'cream').set(6, 9, 'cream');
+  g.fillRect(9, 6, 1, 3, 'amber').set(9, 9, 'gold');
+  return outline(g, { steps: 2 });
+}
+
 function icons(): PixelGrid[] {
   const make: Record<(typeof ICON_NAMES)[number], () => PixelGrid> = {
     hoe: () => toolIcon('hoe'),
@@ -794,6 +844,11 @@ function icons(): PixelGrid[] {
     mutiara: pearlIcon,
     jamur: mushroomIcon,
     pakis: fernIcon,
+    telur: () => eggIcon(['clay', 'tan', 'sand', 'cream'], 'clay'),
+    telurBebek: () => eggIcon(['sea', 'sky', 'foam', 'cream']),
+    susu: milkIcon,
+    wol: woolIcon,
+    madu: honeyIcon,
   };
   return ICON_NAMES.map((n) => make[n]());
 }

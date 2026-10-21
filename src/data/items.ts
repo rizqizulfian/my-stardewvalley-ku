@@ -92,6 +92,13 @@ export const ITEMS: Record<string, ItemDef> = {
   jamur: { id: 'jamur', name: 'Mushroom', kind: 'forage', icon: 'jamur', stack: STACK, price: 25, food: { hunger: 12, energy: 6 } },
   pakis: { id: 'pakis', name: 'Fern Shoot', kind: 'forage', icon: 'pakis', stack: STACK, price: 18, food: { hunger: 8, energy: 4 } },
 
+  // Farm animals and bees.
+  telur: { id: 'telur', name: 'Egg', kind: 'produce', icon: 'telur', stack: STACK, price: 30, food: { hunger: 10, energy: 6 } },
+  telurBebek: { id: 'telurBebek', name: 'Duck Egg', kind: 'produce', icon: 'telurBebek', stack: STACK, price: 45, food: { hunger: 12, energy: 8 } },
+  susu: { id: 'susu', name: 'Milk', kind: 'produce', icon: 'susu', stack: STACK, price: 60, food: { thirst: 35, hunger: 10, energy: 10, drink: true } },
+  wol: { id: 'wol', name: 'Wool', kind: 'produce', icon: 'wol', stack: STACK, price: 90 },
+  madu: { id: 'madu', name: 'Honey', kind: 'produce', icon: 'madu', stack: STACK, price: 80, food: { hunger: 10, energy: 25 } },
+
   wood: { id: 'wood', name: 'Wood', kind: 'resource', icon: 'wood', stack: STACK, price: 2 },
   stone: { id: 'stone', name: 'Stone', kind: 'resource', icon: 'stone', stack: STACK, price: 2 },
   fiber: { id: 'fiber', name: 'Fiber', kind: 'resource', icon: 'fiber', stack: STACK, price: 1 },

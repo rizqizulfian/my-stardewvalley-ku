@@ -6,6 +6,7 @@ import { CHARACTERS } from '../data/characters';
 import { CHAR_FRAMES, buildCharacterFrames } from './characters';
 import { registerBuildings } from './buildings';
 import { registerExtras } from './extras';
+import { registerFarmArt } from './farm';
 import { registerFx } from './fx';
 import { registerItemArt } from './items';
 import { registerNpcArt } from './npcs';
@@ -24,4 +25,5 @@ export function registerAllArt(sink: TextureSink): void {
   }
   registerNpcArt(sink);
   registerExtras(sink);
+  registerFarmArt(sink);
 }

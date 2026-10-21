@@ -83,9 +83,12 @@ export class Gathering {
     const qty = pick.min + Math.floor(Math.random() * (pick.max - pick.min + 1));
     this.rendered.shakeProp(p, 1);
     this.rendered.setPropTexture(p, pick.bare);
-    audio.playSfx('rustle', 0.8);
+    if (pick.hive) audio.playSfx('buzz', 0.8);
+    else {
+      audio.playSfx('rustle', 0.8);
+      this.fx.burst('leaf', p.cx * T + T / 2, p.cy * T, { count: 4, spread: 14, up: 10, z: 22 });
+    }
     this.scene.time.delayedCall(120, () => audio.playSfx('harvest', 0.8));
-    this.fx.burst('leaf', p.cx * T + T / 2, p.cy * T, { count: 4, spread: 14, up: 10, z: 22 });
     this.fx.drop(pick.item, qty, p.cx * T + T / 2, (p.cy + 1) * T);
     return true;
   }

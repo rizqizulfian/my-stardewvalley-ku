@@ -3,6 +3,7 @@
 
 import { BUILDING_TEXTURES as B } from '../art/buildings';
 import { EXTRA_TEXTURES as X, PAINTINGS, SCULPTURES } from '../art/extras';
+import { FARM_TEXTURES as FT, HIVE, WINDMILL } from '../art/farm';
 import { PROP_TEXTURES, bareTexture } from '../art/props';
 import type { ToolKind } from './items';
 import type { Surface } from './terrain';
@@ -81,6 +82,8 @@ export interface PickDef {
   regrowDays: number;
   /** Texture shown while the fruit grows back. */
   bare: string;
+  /** A beehive: no leaves fly, the bees buzz instead. */
+  hive?: boolean;
 }
 
 export type PropUse = 'bed' | 'bench' | 'well' | 'ship' | 'mailbox' | 'board' | 'sign' | 'pick' | `shop:${string}` | `art:${string}`;
@@ -351,6 +354,26 @@ export const PROPS: Record<string, PropDef> = {
     shadow: PROP_TEXTURES.shadowS,
     lights: [{ x: 0, y: -27, texture: 'light-warm', scale: 1 }],
   },
+  hive: {
+    texture: FT.hive,
+    footprint: { w: 1, h: 1 },
+    collider: { x: 2, y: 6, w: 12, h: 9 },
+    anim: { frames: HIVE.frames, ms: 160 },
+    shadow: PROP_TEXTURES.shadowS,
+    use: 'pick',
+    pick: { item: 'madu', min: 1, max: 2, regrowDays: 3, bare: FT.hiveEmpty, hive: true },
+  },
+  hayBarn: { texture: FT.hayBarn, footprint: { w: 7, h: 3 }, collider: { x: 2, y: 10, w: 108, h: 36 }, offsetY: 2, shadow: PROP_TEXTURES.shadowXL },
+  windmill: {
+    texture: FT.windmill,
+    footprint: { w: 3, h: 2 },
+    collider: { x: 10, y: 6, w: 28, h: 24 },
+    anim: { frames: WINDMILL.frames, ms: 260 },
+    offsetY: 1,
+    shadow: PROP_TEXTURES.shadowL,
+  },
+  trough: { texture: FT.trough, footprint: { w: 2, h: 1 }, collider: { x: 2, y: 6, w: 28, h: 9 }, shadow: PROP_TEXTURES.shadowL },
+  hayBale: { texture: FT.hayBale, footprint: { w: 1, h: 1 }, collider: { x: 1, y: 4, w: 14, h: 11 }, shadow: PROP_TEXTURES.shadowS },
   ropePost: { texture: X.ropePost, footprint: { w: 1, h: 1 }, collider: { x: 0, y: 9, w: 16, h: 6 } },
   ...Object.fromEntries(
     PAINTINGS.map((id, i) => [

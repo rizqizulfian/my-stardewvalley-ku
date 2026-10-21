@@ -167,8 +167,9 @@ export class WorldMap {
   /**
    * Can a box (world pixels) stand here at a given elevation?
    * `elevation` null means "on stairs": any elevation is allowed.
+   * `swim` also lets it onto water (the ducks).
    */
-  canOccupy(b: Box, elevation: number | null): boolean {
+  canOccupy(b: Box, elevation: number | null, swim = false): boolean {
     if (b.x < 0 || b.y < 0 || b.x + b.w > this.pixelWidth || b.y + b.h > this.pixelHeight) return false;
     const x0 = Math.floor(b.x / T);
     const x1 = Math.floor((b.x + b.w - 1) / T);
@@ -177,7 +178,7 @@ export class WorldMap {
     for (let cy = y0; cy <= y1; cy++)
       for (let cx = x0; cx <= x1; cx++) {
         const t = this.terrainAt(cx, cy);
-        if (!t.walkable) return false;
+        if (!t.walkable && !(swim && isWaterTerrain(t))) return false;
         if (elevation !== null && !t.stairs && t.elevation !== elevation) return false;
         for (const ci of this.colliderCells.get(this.index(cx, cy)) ?? []) {
           const c = this.colliders[ci];
