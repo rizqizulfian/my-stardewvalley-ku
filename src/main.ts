@@ -10,10 +10,10 @@ import { state } from './systems/GameState';
 import { loadGame } from './systems/save';
 import { installTouchControls } from './ui/TouchControls';
 
-/** Whole-number zoom plus the native size that fills the window at that zoom. */
+/** Zoom that fits viewTilesWide across the window, plus the native size that fills it. */
 function fitView(): { zoom: number; width: number; height: number } {
   const target = RENDER.viewTilesWide * RENDER.tileSize;
-  const zoom = Math.min(RENDER.maxZoom, Math.max(RENDER.minZoom, Math.round(window.innerWidth / target)));
+  const zoom = Math.min(RENDER.maxZoom, Math.max(RENDER.minZoom, window.innerWidth / target));
   return { zoom, width: Math.ceil(window.innerWidth / zoom), height: Math.ceil(window.innerHeight / zoom) };
 }
 

@@ -5,11 +5,11 @@ export const GAME_TITLE = 'Lembah Padi';
 
 export const RENDER = {
   /**
-   * The view shows about this many tiles across (Stardew-like framing). The
-   * native resolution is derived from the window: zoom = round(window / view),
-   * always a whole number, and the native size fills the window at that zoom.
+   * The view shows this many tiles across. The native resolution is derived
+   * from the window: zoom = window / view. That is usually not a whole number,
+   * so some art pixels come out one screen pixel wider than their neighbours.
    */
-  viewTilesWide: 40,
+  viewTilesWide: 35,
   /** Fallback native size, also used for generated full-screen textures. */
   width: 480,
   height: 270,
