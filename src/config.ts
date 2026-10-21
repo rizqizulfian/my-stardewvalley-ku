@@ -9,7 +9,7 @@ export const RENDER = {
    * native resolution is derived from the window: zoom = round(window / view),
    * always a whole number, and the native size fills the window at that zoom.
    */
-  viewTilesWide: 30,
+  viewTilesWide: 40,
   /** Fallback native size, also used for generated full-screen textures. */
   width: 480,
   height: 270,
