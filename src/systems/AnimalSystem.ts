@@ -50,20 +50,21 @@ export class AnimalSystem {
     }
   }
 
-  /** Each game minute: send animals through the barn door, or let them in. */
+  /** Each game minute: send animals through the barn (or house) door, or let them in. */
   onMinute(): void {
-    const door = BARN.doors[this.map.def.id];
-    if (!door) return;
+    const id = this.map.def.id;
     const px = (c: { x: number; y: number }) => ({ x: c.x * T + T / 2, y: c.y * T + T - 2 });
-    const detour = BARN.detour[this.map.def.id];
     for (const def of ANIMALS) {
+      const door = def.home ? def.home.doors[id] : BARN.doors[id];
+      if (!door) continue;
+      const detour = def.home ? undefined : BARN.detour[id];
       const place = animalPlace(def, this.state.minute, this.state.weather);
       const here = this.animals.find((a) => a.def.id === def.id);
-      if (here && place.map !== this.map.def.id && !here.leaving) {
+      if (here && place.map !== id && !here.leaving) {
         const route = detour && here.y < detour.aboveRow * T ? [...detour.via.map(px), px(door)] : [px(door)];
         here.leave(route, () => this.remove(here));
       }
-      else if (!here && place.map === this.map.def.id) this.enter(def, door, place.area);
+      else if (!here && place.map === id) this.enter(def, door, place.area);
     }
   }
 

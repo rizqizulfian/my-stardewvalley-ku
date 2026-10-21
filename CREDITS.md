@@ -28,5 +28,8 @@ project owner shared.
 * **Jotaro** and **Star Platinum** are fan tributes to *JoJo's Bizarre Adventure* by Hirohiko Araki
   (characters owned by Araki / Shueisha), redrawn as original pixel art at the project owner's request.
   Fine for a personal project; remove or replace them before publishing the game commercially.
+* **Mofu**, the pet cat in a shark-hood costume in front of the farmhouse, is a fan tribute to *mofusand*
+  by juno (character owned by juno / mofusand), redrawn as original pixel art at the project owner's request.
+  Fine for a personal project; remove or replace it before publishing the game commercially.
 * **Pak Prabowo** is a friendly tribute villager added at the project owner's request (farming small talk
   only, no politics).

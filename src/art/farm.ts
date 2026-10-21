@@ -1,4 +1,5 @@
-// Phase 6 farm art: farm animals (chicken, duck, cat, sheep, cow), beehives,
+// Phase 6 farm art: farm animals (chicken, duck, cat, sheep, cow), Mofu the
+// pet (a mofusand-style cat in a shark hood), beehives,
 // the long hay barn, the animal barn (kandang) and its fittings, the windmill
 // and a water trough.
 
@@ -21,16 +22,19 @@ export const FARM_TEXTURES = {
 
 export const animalTexture = (kind: AnimalKind) => `animal-${kind}`;
 
-export type AnimalKind = 'chicken' | 'duck' | 'cat' | 'sheep' | 'cow';
+export type AnimalKind = 'chicken' | 'duck' | 'cat' | 'sheep' | 'cow' | 'mofusand';
 
 /** Animal sheets: idle, idle (head down / blink), walk x2. Drawn facing right. */
 export const ANIMAL_FRAMES = { idle: [0, 1], walk: [2, 3], count: 4 } as const;
+/** Kinds with an extra frame 4: curled up asleep. */
+export const ANIMAL_SLEEP_FRAME: Partial<Record<AnimalKind, number>> = { mofusand: 4 };
 export const ANIMAL_SIZE: Record<AnimalKind, { w: number; h: number }> = {
   chicken: { w: 14, h: 14 },
   duck: { w: 16, h: 14 },
   cat: { w: 16, h: 14 },
   sheep: { w: 22, h: 18 },
   cow: { w: 30, h: 24 },
+  mofusand: { w: 19, h: 18 },
 };
 
 export const WINDMILL = { w: 64, h: 104, frames: 4 } as const;
@@ -153,7 +157,48 @@ function cow(f: number): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
-const ANIMAL_DRAW: Record<AnimalKind, (f: number) => PixelGrid> = { chicken, duck, cat, sheep, cow };
+/**
+ * Mofu: a chubby white mofusand-style cat (dot eyes, tiny mouth) peeking out
+ * of a blue shark costume with a fin on top and a tail fin behind. Frames:
+ * 0 sit, 1 blink, 2-3 shuffle, 4 asleep (a flat loaf, eyes shut).
+ */
+function mofusand(f: number): PixelGrid {
+  const { w: W, h: H } = ANIMAL_SIZE.mofusand;
+  const g = new PixelGrid(W, H);
+  const shark: Ramp = ['deep', 'sea', 'sky', 'foam'];
+  const fur: Ramp = ['haze', 'mist', 'cream', 'cream'];
+  const asleep = f === 4;
+  // It sinks into a loaf when it sleeps, and bobs as it shuffles.
+  const dy = asleep ? 2 : f === 3 ? -1 : 0;
+  const by = asleep ? 1 : 0;
+  // Paws: little white beans, swapping on the walk.
+  if (!asleep) {
+    const step = f === 2 ? 1 : f === 3 ? -1 : 0;
+    g.fillRect(6 + step, 16, 2, 2, 'mist').fillRect(11 - step, 16, 2, 2, 'mist');
+  }
+  // Tail fin behind, flicking on the blink frame.
+  const flick = f === 1 ? -1 : 0;
+  g.line(3, 13 + by, 1, 10 + by + flick, 'sea').line(3, 14 + by, 0, 13 + by, 'sea').set(1, 11 + by + flick, 'sky').set(0, 12 + by + flick, 'sea');
+  // Chubby body in the shark suit, white tummy.
+  blob(g, [[9.5, 13.5 + by, 6.5, asleep ? 3.2 : 3.8]], shark);
+  g.stamp(shade(new PixelGrid(W, H).fillEllipse(6, 13 + by, 9, 4 - by, 'ink'), fur, { rim: 0.2, gradient: 0.4 }));
+  // The hood: a big round shark head with a fin on top.
+  g.line(8, 2 + dy, 9, 0 + dy, 'sea').line(9, 2 + dy, 10, 0 + dy, 'sky').set(10, 1 + dy, 'sea');
+  blob(g, [[10.5, 7.5 + dy, 7, 6]], shark);
+  // The shark's open mouth: a pink rim with white teeth round the cat's face.
+  g.fillEllipse(6, 4 + dy, 11, 9, 'rose');
+  g.fillEllipse(7, 6 + dy, 9, 6, 'cream');
+  for (const x of [8, 10, 12, 14]) g.set(x, 5 + dy, 'cream');
+  // Dot eyes (or shut), a tiny ω mouth, pink cheeks.
+  const ey = 8 + dy;
+  if (f === 0 || f === 2 || f === 3) g.set(9, ey, 'ink').set(13, ey, 'ink');
+  else g.line(8, ey, 9, ey, 'night').line(13, ey, 14, ey, 'night');
+  g.set(10, ey + 1, 'skinShade').set(12, ey + 1, 'skinShade').set(11, ey + 2, 'skinShade');
+  g.set(8, ey + 1, 'rose').set(14, ey + 1, 'rose');
+  return outline(g, { steps: 2 });
+}
+
+const ANIMAL_DRAW: Record<AnimalKind, (f: number) => PixelGrid> = { chicken, duck, cat, sheep, cow, mofusand };
 
 // ---------------------------------------------------------------------------
 // Beehive: a white wooden box hive on legs; bees drift around it. The full
@@ -379,7 +424,8 @@ function manger(): PixelGrid {
 export function registerFarmArt(sink: TextureSink): void {
   for (const kind of Object.keys(ANIMAL_DRAW) as AnimalKind[]) {
     const { w, h } = ANIMAL_SIZE[kind];
-    sink.sheet(animalTexture(kind), [0, 1, 2, 3].map((f) => ANIMAL_DRAW[kind](f)), w, h);
+    const frames = ANIMAL_SLEEP_FRAME[kind] ? [0, 1, 2, 3, 4] : [0, 1, 2, 3];
+    sink.sheet(animalTexture(kind), frames.map((f) => ANIMAL_DRAW[kind](f)), w, h);
   }
   sink.sheet(FARM_TEXTURES.hive, [0, 1, 2].map((f) => hive(true, f)), HIVE.w, HIVE.h);
   sink.sheet(FARM_TEXTURES.hiveEmpty, [0, 1, 2].map((f) => hive(false, f)), HIVE.w, HIVE.h);
