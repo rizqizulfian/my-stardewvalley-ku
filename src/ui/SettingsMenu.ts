@@ -1,4 +1,4 @@
-// Esc menu: volumes, mute, save now, start a new farm, and the controls.
+// Esc menu: volumes, mute, zoom, save now, start a new farm, and the controls.
 // Keyboard (up/down to pick, left/right to change, Enter/Space/X to use) or mouse.
 
 import Phaser from 'phaser';
@@ -7,6 +7,8 @@ import { audio, type Bus } from '../audio/AudioManager';
 import { EV, bus } from '../systems/events';
 import type { GameState } from '../systems/GameState';
 import { saveGame } from '../systems/save';
+import { onZoomChange, setZoomLevel, zoomLevel } from '../systems/viewZoom';
+import { ZOOM } from '../config';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
 
@@ -28,15 +30,21 @@ export const CONTROLS = [
   'X / right-click  pick, talk, sit, read',
   '1-0 / wheel  choose item    E  backpack',
   'M  mute    H  help    Esc  this menu',
+  '+ / -  zoom in / out (phone: pinch)',
 ];
 
-type RowKind = { kind: 'volume'; bus: Bus; label: string } | { kind: 'mute' } | { kind: 'action'; id: 'save' | 'new' | 'close'; label: string };
+type RowKind =
+  | { kind: 'volume'; bus: Bus; label: string }
+  | { kind: 'mute' }
+  | { kind: 'zoom'; label: string }
+  | { kind: 'action'; id: 'save' | 'new' | 'close'; label: string };
 
 const ROWS: RowKind[] = [
   { kind: 'volume', bus: 'music', label: 'Music' },
   { kind: 'volume', bus: 'ambience', label: 'Ambience' },
   { kind: 'volume', bus: 'sfx', label: 'Sound effects' },
   { kind: 'mute' },
+  { kind: 'zoom', label: 'Zoom' },
   { kind: 'action', id: 'save', label: 'Save now' },
   { kind: 'action', id: 'new', label: 'Start a new farm' },
   { kind: 'action', id: 'close', label: 'Back to the game' },
@@ -88,6 +96,10 @@ export class SettingsMenu {
             const lx = p.x - this.root.x - LAYOUT.barX;
             if (lx >= 0) this.setVolume(r.bus, Math.min(LAYOUT.steps, Math.ceil(lx / LAYOUT.barStep)) / LAYOUT.steps);
             else this.change(1);
+          } else if (r.kind === 'zoom') {
+            const lx = p.x - this.root.x - LAYOUT.barX;
+            if (lx >= 0) this.setZoom(Math.floor(lx / LAYOUT.barStep));
+            else this.change(1);
           } else this.activate();
         });
       this.root.add([hit, label, value]);
@@ -97,6 +109,7 @@ export class SettingsMenu {
     const cy = LAYOUT.titleH + ROWS.length * LAYOUT.rowH + 4;
     this.root.add(scene.add.rectangle(6, cy, LAYOUT.w - 12, 1, hex('mist')).setOrigin(0, 0));
     CONTROLS.forEach((line, i) => this.root.add(new PixelText(scene, LAYOUT.pad, cy + 5 + i * 9, line, { color: 'umber', shadow: 'mist' })));
+    onZoomChange(() => this.refresh());
   }
 
   get isOpen(): boolean {
@@ -137,13 +150,14 @@ export class SettingsMenu {
     if (!this.open_) return;
     const r = ROWS[this.cursor];
     if (r.kind === 'volume') this.setVolume(r.bus, Math.round(audio.settings[r.bus] * LAYOUT.steps + d) / LAYOUT.steps);
+    else if (r.kind === 'zoom') this.setZoom(zoomLevel() + d);
     else if (r.kind === 'mute') this.activate();
   }
 
   activate(): void {
     if (!this.open_) return;
     const r = ROWS[this.cursor];
-    if (r.kind === 'volume') return this.change(1);
+    if (r.kind === 'volume' || r.kind === 'zoom') return this.change(1);
     if (r.kind === 'mute') {
       audio.toggleMute();
       audio.playSfx('uiClick', 0.8);
@@ -173,6 +187,12 @@ export class SettingsMenu {
     this.refresh();
   }
 
+  private setZoom(n: number): void {
+    setZoomLevel(n);
+    audio.playSfx('select', 0.8);
+    this.refresh();
+  }
+
   refresh(): void {
     if (!this.open_) return;
     this.highlight.setY(LAYOUT.titleH + this.cursor * LAYOUT.rowH);
@@ -187,6 +207,13 @@ export class SettingsMenu {
           this.bars.fillStyle(hex(k < filled ? (audio.settings.muted ? 'clay' : 'leaf') : 'cream')).fillRect(x + 1, y + 4, LAYOUT.barStep - 4, 5);
         }
         this.values[i].setText('');
+      } else if (r.kind === 'zoom') {
+        // One box per zoom step; the filled run shows how far in it is.
+        for (let k = 0; k < ZOOM.factors.length; k++) {
+          const x = LAYOUT.barX + k * LAYOUT.barStep;
+          this.bars.fillStyle(hex('umber')).fillRect(x, y + 3, LAYOUT.barStep - 2, 7);
+          this.bars.fillStyle(hex(k <= zoomLevel() ? 'sky' : 'cream')).fillRect(x + 1, y + 4, LAYOUT.barStep - 4, 5);
+        }
       } else if (r.kind === 'mute') this.values[i].setText(audio.settings.muted ? 'On' : 'Off');
       else if (r.id === 'new') {
         const confirming = this.scene.time.now < this.confirmUntil;
