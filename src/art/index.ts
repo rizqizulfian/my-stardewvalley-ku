@@ -5,6 +5,7 @@ import { PLAYER } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { CHAR_FRAMES, buildCharacterFrames } from './characters';
 import { registerBuildings } from './buildings';
+import { registerExtras } from './extras';
 import { registerFx } from './fx';
 import { registerItemArt } from './items';
 import { registerNpcArt } from './npcs';
@@ -22,4 +23,5 @@ export function registerAllArt(sink: TextureSink): void {
     sink.sheet(c.texture, buildCharacterFrames(c.look), PLAYER.frameWidth, PLAYER.frameHeight, CHAR_FRAMES.perFacing);
   }
   registerNpcArt(sink);
+  registerExtras(sink);
 }

@@ -96,7 +96,7 @@ export class NpcSystem {
   }
 
   /** A music note floats up from a dancer. */
-  private note(x: number, y: number): void {
+  note(x: number, y: number): void {
     const img = this.scene.add.image(Math.round(x), Math.round(y), FX_TEXTURES.note, Math.floor(Math.random() * 2)).setDepth(DEPTH.particlesAbove);
     this.notes.push(img);
     this.scene.tweens.add({

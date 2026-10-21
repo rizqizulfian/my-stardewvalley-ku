@@ -37,7 +37,7 @@ export const INTERIOR_TILE = {
   wallLower: 7,
   wallTop: 8,
   void: 9,
-  /** Same wall frames in a second colourway, for shops. */
+  /** Tiles per colourway (see INTERIOR_STYLES). */
   altOffset: 10,
 } as const;
 
@@ -438,26 +438,48 @@ function seaTile(mask: number, frame: number, variant = 0): PixelGrid {
 // ---------------------------------------------------------------------------
 // Interiors (per cell)
 
-function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right'): PixelGrid {
-  // Warm wooden boards, 4px wide, running left to right with staggered ends.
+type FloorStyle = 'wood' | 'paper' | 'marble';
+
+function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right', style: FloorStyle = 'wood'): PixelGrid {
   const g = new PixelGrid(T, T);
-  for (let y = 0; y < T; y++) {
-    const board = Math.floor(y / 4);
-    const off = (board * 5 + variant * 7) % T;
-    for (let x = 0; x < T; x++) {
-      let c: ColorName = y % 4 === 3 ? 'umber' : y % 4 === 0 ? 'tan' : 'clay';
-      if ((x + off) % T === 0) c = 'umber';
-      else if (y % 4 === 1 && hash2(x + variant * 31, board, 83) < 0.08) c = 'tan';
-      g.set(x, y, c);
+  let dark: ColorName = 'umber';
+  let darker: ColorName = 'bark';
+  if (style === 'wood') {
+    // Warm wooden boards, 4px wide, running left to right with staggered ends.
+    for (let y = 0; y < T; y++) {
+      const board = Math.floor(y / 4);
+      const off = (board * 5 + variant * 7) % T;
+      for (let x = 0; x < T; x++) {
+        let c: ColorName = y % 4 === 3 ? 'umber' : y % 4 === 0 ? 'tan' : 'clay';
+        if ((x + off) % T === 0) c = 'umber';
+        else if (y % 4 === 1 && hash2(x + variant * 31, board, 83) < 0.08) c = 'tan';
+        g.set(x, y, c);
+      }
     }
+  } else if (style === 'paper') {
+    // Blank paper: almost nothing, a few faint specks.
+    g.fillRect(0, 0, T, T, 'cream');
+    for (let i = 0; i < 2; i++) g.set(Math.floor(hash2(variant, i, 84) * T), Math.floor(hash2(variant, i, 85) * T), 'mist');
+    dark = 'mist';
+    darker = 'haze';
+  } else {
+    // Polished stone: big pale slabs with thin grout and a soft sheen.
+    for (let y = 0; y < T; y++)
+      for (let x = 0; x < T; x++) {
+        const grout = x === 0 || y === 0;
+        const sheen = (x + y + variant * 3) % 13 === 0;
+        g.set(x, y, grout ? 'haze' : sheen ? 'cream' : hash2(x + variant * 17, y, 86) < 0.06 ? 'haze' : 'mist');
+      }
+    dark = 'haze';
+    darker = 'mauve';
   }
-  if (shadow === 'top') for (let x = 0; x < T; x++) g.set(x, 0, 'bark').set(x, 1, 'umber').set(x, 2, ditherPick(x, 2, 0.5) ? 'umber' : g.colorAt(x, 2)!);
-  if (shadow === 'left') for (let y = 0; y < T; y++) g.set(0, y, 'bark').set(1, y, 'umber');
-  if (shadow === 'right') for (let y = 0; y < T; y++) g.set(T - 1, y, 'bark').set(T - 2, y, 'umber');
+  if (shadow === 'top') for (let x = 0; x < T; x++) g.set(x, 0, darker).set(x, 1, dark).set(x, 2, ditherPick(x, 2, 0.5) ? dark : g.colorAt(x, 2)!);
+  if (shadow === 'left') for (let y = 0; y < T; y++) g.set(0, y, darker).set(1, y, dark);
+  if (shadow === 'right') for (let y = 0; y < T; y++) g.set(T - 1, y, darker).set(T - 2, y, dark);
   return g;
 }
 
-function wallTiles(paper: [ColorName, ColorName, ColorName], wains: [ColorName, ColorName, ColorName]): PixelGrid[] {
+function wallTiles(paper: [ColorName, ColorName, ColorName], wains: [ColorName, ColorName, ColorName], beam: [ColorName, ColorName] = ['bark', 'umber']): PixelGrid[] {
   const [pDark, pBase, pLight] = paper;
   const upper = new PixelGrid(T, T).fillRect(0, 0, T, T, pBase);
   // Wallpaper: small diamond motif.
@@ -473,24 +495,48 @@ function wallTiles(paper: [ColorName, ColorName, ColorName], wains: [ColorName, 
   for (let x = 3; x < T; x += 8) lower.fillRect(x, 9, 1, 4, wDark).fillRect(x + 1, 9, 1, 4, wLight);
   lower.fillRect(0, 13, T, 1, wDark);
   const top = upper.clone();
-  top.fillRect(0, 0, T, 3, 'bark').fillRect(0, 3, T, 1, 'umber').fillRect(0, 4, T, 1, pDark);
+  top.fillRect(0, 0, T, 3, beam[0]).fillRect(0, 3, T, 1, beam[1]).fillRect(0, 4, T, 1, pDark);
   return [upper, lower, top];
 }
 
+/** A doodle room: plain white walls with one pen line where wall meets floor. */
+function paperWalls(): PixelGrid[] {
+  const upper = new PixelGrid(T, T).fillRect(0, 0, T, T, 'cream');
+  const lower = upper.clone().fillRect(0, T - 2, T, 1, 'ink').fillRect(0, T - 1, T, 1, 'mist');
+  const top = upper.clone();
+  return [upper, lower, top];
+}
+
+/** Interior colourways, in tileset order (each is INTERIOR_TILE.altOffset tiles). */
+export const INTERIOR_STYLES = ['home', 'shop', 'paper', 'gallery'] as const;
+
 function interiorTiles(): PixelGrid[] {
   const v = new PixelGrid(T, T).fillRect(0, 0, T, T, 'ink');
-  const out = [
-    floorTile(0, 'none'),
-    floorTile(1, 'none'),
-    floorTile(2, 'none'),
-    floorTile(0, 'top'),
-    floorTile(1, 'left'),
-    floorTile(2, 'right'),
+  const floors = (style: FloorStyle) => [
+    floorTile(0, 'none', style),
+    floorTile(1, 'none', style),
+    floorTile(2, 'none', style),
+    floorTile(0, 'top', style),
+    floorTile(1, 'left', style),
+    floorTile(2, 'right', style),
+  ];
+  return [
+    ...floors('wood'),
     ...wallTiles(['tan', 'sand', 'cream'], ['bark', 'umber', 'clay']),
     v,
+    // Shops: cool plaster with dark wood.
+    ...floors('wood'),
+    ...wallTiles(['haze', 'mist', 'cream'], ['bark', 'clay', 'tan']),
+    v,
+    // Paper: an all-white doodle room (the void is white too).
+    ...floors('paper'),
+    ...paperWalls(),
+    new PixelGrid(T, T).fillRect(0, 0, T, T, 'cream'),
+    // Gallery: deep red walls, dark wood dado, marble floor.
+    ...floors('marble'),
+    ...wallTiles(['wine', 'brick', 'coral'], ['bark', 'umber', 'gold'], ['night', 'plum']),
+    v,
   ];
-  // Second colourway (shops): cool plaster with dark wood.
-  return [...out, ...out.slice(0, 6), ...wallTiles(['haze', 'mist', 'cream'], ['bark', 'clay', 'tan']), v];
 }
 
 function dockTiles(): PixelGrid[] {

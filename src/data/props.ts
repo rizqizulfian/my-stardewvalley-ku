@@ -2,6 +2,7 @@
 // marks the bottom-left cell of the prop's footprint.
 
 import { BUILDING_TEXTURES as B } from '../art/buildings';
+import { EXTRA_TEXTURES as X, PAINTINGS, SCULPTURES } from '../art/extras';
 import { PROP_TEXTURES, bareTexture } from '../art/props';
 import type { ToolKind } from './items';
 import type { Surface } from './terrain';
@@ -67,6 +68,10 @@ export interface PropDef {
   use?: PropUse;
   /** Fruit the action button picks; it grows back after some days. */
   pick?: PickDef;
+  /** Sheet frame to show (one sheet holding several pictures). */
+  frame?: number;
+  /** Loops through sheet frames on its own (fountains, windmill sails). */
+  anim?: { frames: number; ms: number };
 }
 
 export interface PickDef {
@@ -78,7 +83,7 @@ export interface PickDef {
   bare: string;
 }
 
-export type PropUse = 'bed' | 'bench' | 'well' | 'ship' | 'mailbox' | 'board' | 'sign' | 'pick' | `shop:${string}`;
+export type PropUse = 'bed' | 'bench' | 'well' | 'ship' | 'mailbox' | 'board' | 'sign' | 'pick' | `shop:${string}` | `art:${string}`;
 
 const fruit = (texture: string, item: string, min: number, max: number): Pick<PropDef, 'use' | 'pick'> => ({
   use: 'pick',
@@ -307,6 +312,58 @@ export const PROPS: Record<string, PropDef> = {
     lights: [{ x: 0, y: -24, texture: 'light-warm', scale: 1.1 }],
   },
   doormat: { texture: B.doormat, footprint: { w: 1, h: 1 }, flat: true, offsetY: -3, offsetX: 8 },
+  // Phase 6: dog house, museum, park ----------------------------------------
+  dogHouse: {
+    texture: X.dogHouse,
+    footprint: { w: 3, h: 2 },
+    collider: { x: 3, y: 2, w: 42, h: 26 },
+    offsetY: 1,
+    shadow: PROP_TEXTURES.shadowL,
+    emissive: X.dogHouseLit,
+    lights: [{ x: 0, y: -14, texture: 'light-window', scale: 0.8 }],
+  },
+  museum: {
+    texture: X.museum,
+    footprint: { w: 7, h: 4 },
+    collider: { x: 2, y: 8, w: 108, h: 48 },
+    offsetY: 1,
+    shadow: PROP_TEXTURES.shadowXL,
+    emissive: X.museumLit,
+    lights: [
+      { x: 0, y: -22, texture: 'light-window', scale: 1.2 },
+      { x: -31, y: -30, texture: 'light-window', scale: 0.9 },
+      { x: 31, y: -30, texture: 'light-window', scale: 0.9 },
+    ],
+  },
+  bigFountain: {
+    texture: X.bigFountain,
+    footprint: { w: 5, h: 3 },
+    collider: { x: 2, y: 8, w: 76, h: 38 },
+    anim: { frames: 4, ms: 140 },
+    offsetX: 2,
+    shadow: PROP_TEXTURES.shadowXL,
+  },
+  hedge: { texture: X.hedge, footprint: { w: 1, h: 1 }, collider: { x: 0, y: 6, w: 16, h: 9 }, shadow: PROP_TEXTURES.shadowM },
+  parkLamp: {
+    texture: X.parkLamp,
+    footprint: { w: 1, h: 1 },
+    collider: { x: 6, y: 11, w: 4, h: 4 },
+    shadow: PROP_TEXTURES.shadowS,
+    lights: [{ x: 0, y: -27, texture: 'light-warm', scale: 1 }],
+  },
+  ropePost: { texture: X.ropePost, footprint: { w: 1, h: 1 }, collider: { x: 0, y: 9, w: 16, h: 6 } },
+  ...Object.fromEntries(
+    PAINTINGS.map((id, i) => [
+      `painting-${id}`,
+      { texture: X.painting, frame: i, footprint: { w: 2, h: 1 }, flat: true, offsetY: -1, use: `art:${id}` } satisfies PropDef,
+    ]),
+  ),
+  ...Object.fromEntries(
+    SCULPTURES.map((id, i) => [
+      `sculpture-${id}`,
+      { texture: X.sculpture, frame: i, footprint: { w: 1, h: 1 }, collider: { x: 2, y: 8, w: 12, h: 7 }, shadow: PROP_TEXTURES.shadowS, use: `art:${id}` } satisfies PropDef,
+    ]),
+  ),
 };
 
 /** Default characters for prop rows. '-' is empty, '#' marks cells covered by a larger prop. */

@@ -6,10 +6,12 @@ import { PLAYER_CHARACTER } from '../data/characters';
 import type { Facing } from '../art/characters';
 import { FX_TEXTURES, EMOTE } from '../art/fx';
 import { letter } from '../data/mail';
+import { ARTWORKS } from '../data/museum';
 import { MAPS } from '../data/maps';
 import { musicFor } from '../data/music';
 import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
+import { DOG_BEAT_MS, DogDance } from '../entities/DogDance';
 import { Player } from '../entities/Player';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
@@ -80,6 +82,8 @@ export class WorldScene extends Phaser.Scene {
   private gather!: Gathering;
   private weather!: Weather;
   private mailFlag: Phaser.GameObjects.Image | null = null;
+  private dog: DogDance | null = null;
+  private closedNoticeAt = 0;
   private camX = 0;
   private camY = 0;
   private started = false;
@@ -109,7 +113,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.onFootstep = (surface) => audio.footstep(surface);
 
     this.time2 = new TimeSystem(state);
-    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor);
+    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor, this.def.interiorStyle === 'paper');
     this.weather = new Weather(this, state.weather === 'rain', !!this.def.indoor);
     this.fx = new Effects(this);
     this.fx.collect = (id, qty) => {
@@ -120,7 +124,8 @@ export class WorldScene extends Phaser.Scene {
     };
     this.tools = new ToolController(this, state, this.map, this.rendered, this.farm, this.player, this.fx);
     this.npcs = new NpcSystem(this, this.map, state, this.fx);
-    this.player.blocked = (b) => this.npcs.blocked(b);
+    this.dog = this.def.dancer ? new DogDance(this, this.def.dancer) : null;
+    this.player.blocked = (b) => this.npcs.blocked(b) || !!this.dog?.blocks(b);
     this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
     ensureForage(state);
     this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
@@ -135,6 +140,7 @@ export class WorldScene extends Phaser.Scene {
     }
     this.tools.onCast = () => this.fishing.cast();
     this.tools.onTalk = (px, py) => {
+      if (this.dog && this.dog.distanceTo(px, py) < 24) return this.talkToDog();
       const n = this.npcs.at(px, py);
       if (!n) return false;
       this.player.face(n.x, n.y - 6);
@@ -207,6 +213,8 @@ export class WorldScene extends Phaser.Scene {
       this.fishing.destroy();
       this.gather.destroy();
       this.weather.destroy();
+      this.dog?.destroy();
+      this.dog = null;
       this.mailFlag = null;
       this.npcs.destroy();
       this.fx.destroy();
@@ -216,7 +224,12 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.snapCamera();
-    this.cameras.main.fadeIn(FADE_IN_MS, 0, 0, 0);
+    const entrance = this.def.entrance;
+    if (entrance) {
+      // Hold on black, then fade slowly up into the room.
+      this.cameras.main.fadeOut(1, 0, 0, 0);
+      this.time.delayedCall(entrance.blackMs, () => this.cameras.main.fadeIn(entrance.fadeMs, 0, 0, 0));
+    } else this.cameras.main.fadeIn(FADE_IN_MS, 0, 0, 0);
     this.leaving = false;
     if (uiState.started) this.onStarted();
     else bus.once(EV.started, this.onStarted, this);
@@ -236,6 +249,14 @@ export class WorldScene extends Phaser.Scene {
   /** Leave through an exit: fade out, switch map, restart the scene there. */
   private warp(w: WarpDef): void {
     if (this.leaving) return;
+    if (w.hours && (state.minute < w.hours[0] || state.minute >= w.hours[1])) {
+      if (this.time.now > this.closedNoticeAt) {
+        this.closedNoticeAt = this.time.now + 2500;
+        audio.playSfx('bonk', 0.5);
+        bus.emit(EV.notice, `${w.place ?? 'It'} is closed. Open ${formatClock(w.hours[0])} - ${formatClock(w.hours[1])}.`);
+      }
+      return;
+    }
     this.leaving = true;
     this.tools.enabled = false;
     audio.playSfx(w.door ? 'door' : 'whoosh', 0.8);
@@ -296,6 +317,12 @@ export class WorldScene extends Phaser.Scene {
       case 'pick':
         return this.pickFruit(p);
       default:
+        if (use.startsWith('art:')) {
+          const a = ARTWORKS[use.slice(4)];
+          if (!a) return false;
+          dialog({ speaker: a.title, pages: [`"${a.title}". ${a.artist}.`, a.text] });
+          return true;
+        }
         return false;
     }
   }
@@ -327,6 +354,21 @@ export class WorldScene extends Phaser.Scene {
         if (state.mail.length) bus.emit(EV.notice, `${state.mail.length} more letter${state.mail.length > 1 ? 's' : ''} in the mailbox.`);
       },
     });
+  }
+
+  private talkToDog(): boolean {
+    const dog = this.dog!;
+    this.player.face(dog.x, dog.y - 8);
+    dog.love();
+    audio.playSfx('heart', 0.7);
+    dialog({
+      pages: ['The little dog is dancing its heart out. An old brick phone lies on the floor next to it.'],
+      choices: ['Dance along!', 'Just watch'],
+      onChoose: (i) => {
+        if (i === 0) this.time.delayedCall(250, () => this.player.dance(16, DOG_BEAT_MS, () => dog.love()));
+      },
+    });
+    return true;
   }
 
   private pickFruit(p: PlacedProp): boolean {
@@ -462,6 +504,7 @@ export class WorldScene extends Phaser.Scene {
     }
     if (!uiState.menuOpen) this.fishing.update(delta);
     this.npcs.update(delta, this.player.x, this.player.y, this.player.feet());
+    this.dog?.update(delta, (x, y) => this.npcs.note(x, y));
     this.fx.update(delta, this.player.x, this.player.y);
     if (time > this.nextSparkle) {
       this.nextSparkle = time + RIPE_SPARKLE_MS;

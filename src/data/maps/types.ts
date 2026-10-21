@@ -39,13 +39,17 @@ export interface MapDef {
   tillable?: boolean;
   /** Indoor maps: steady lighting, no sky effects. 'shop' picks the second wall colourway. */
   indoor?: boolean;
-  interiorStyle?: 'home' | 'shop';
+  interiorStyle?: 'home' | 'shop' | 'paper' | 'gallery';
   /** Exits: stepping into the rectangle (cells) moves the player to another map. */
   warps?: WarpDef[];
   /** What signposts here say. */
   sign?: string;
   /** Pages pinned to notice boards here. */
   board?: string[];
+  /** A slow way in: the screen stays black, then fades up (the dog's room). */
+  entrance?: { blackMs: number; fadeMs: number };
+  /** Where the dancing dog stands (feet cell). */
+  dancer?: { x: number; y: number };
 }
 
 export interface WarpDef {
@@ -60,4 +64,8 @@ export interface WarpDef {
   face?: 'down' | 'up' | 'left' | 'right';
   /** Door sound instead of a plain fade. */
   door?: boolean;
+  /** Opening hours (minutes); outside them the door is locked. */
+  hours?: [number, number];
+  /** Name for the "closed" notice. */
+  place?: string;
 }

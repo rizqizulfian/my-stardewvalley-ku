@@ -25,6 +25,8 @@ export interface ActionSpec {
   onImpact?: () => void;
   /** Called after the last frame, when the player is free again. */
   onEnd?: () => void;
+  /** Body pose per frame (CHAR_FRAMES numbers) for gestures without a tool, e.g. dancing. */
+  poses?: readonly number[];
 }
 
 interface RunningAction extends ActionSpec {
@@ -158,7 +160,7 @@ export class Player {
 
   private showActionFrame(): void {
     const a = this.action!;
-    const pose = a.tool ? (a.frame === 0 ? CHAR_FRAMES.use[0] : CHAR_FRAMES.use[1]) : CHAR_FRAMES.idle[0];
+    const pose = a.tool ? (a.frame === 0 ? CHAR_FRAMES.use[0] : CHAR_FRAMES.use[1]) : a.poses ? a.poses[a.frame % a.poses.length] : CHAR_FRAMES.idle[0];
     this.sprite.setFrame(charFrame(this.facing, pose));
     if (!a.tool) {
       this.tool.setVisible(false);
@@ -195,6 +197,12 @@ export class Player {
       if (a.frame === a.impact) this.fireImpact();
       this.showActionFrame();
     }
+  }
+
+  /** Dance on the spot for a number of beats. */
+  dance(beats: number, beatMs: number, onEnd?: () => void): boolean {
+    this.facing = 'down';
+    return this.act({ tool: null, frames: new Array(beats).fill(beatMs), impact: -1, poses: CHAR_FRAMES.dance, onEnd });
   }
 
   /** Turn to face a world point (used when aiming with the mouse). */

@@ -13,6 +13,7 @@ import {
   DUAL_TILE_COUNT,
   FULL_VARIANTS,
   GRASS_VARIANTS,
+  INTERIOR_STYLES,
   INTERIOR_TILE,
   WATER_TILES_PER_FRAME,
   TERRAIN_TEXTURES,
@@ -123,21 +124,21 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
   const seed = map.def.seed;
 
   // Interiors: floor boards, wall faces two cells tall, black void around the room.
-  const altWalls = map.def.interiorStyle === 'shop' ? INTERIOR_TILE.altOffset : 0;
+  const style = Math.max(0, INTERIOR_STYLES.indexOf(map.def.interiorStyle ?? 'home')) * INTERIOR_TILE.altOffset;
   const kindIs = (x: number, y: number, k: 'floor' | 'wall' | 'void') => map.inBounds(x, y) && TERRAIN[map.kindAt(x, y)].interior === k;
   for (let y = 0; y < map.h; y++)
     for (let x = 0; x < map.w; x++) {
       const t = TERRAIN[map.kindAt(x, y)];
-      if (t.interior === 'void') interior.putTileAt(GID.interior + INTERIOR_TILE.void, x, y);
+      if (t.interior === 'void') interior.putTileAt(GID.interior + style + INTERIOR_TILE.void, x, y);
       else if (t.interior === 'wall') {
         const f = !kindIs(x, y + 1, 'wall') ? INTERIOR_TILE.wallLower : !kindIs(x, y - 1, 'wall') ? INTERIOR_TILE.wallTop : INTERIOR_TILE.wallUpper;
-        interior.putTileAt(GID.interior + altWalls + f, x, y);
+        interior.putTileAt(GID.interior + style + f, x, y);
       } else if (t.interior === 'floor') {
         let f: number = Math.floor(hash2(x, y, seed) * INTERIOR_TILE.floorVariants);
         if (kindIs(x, y - 1, 'wall')) f = INTERIOR_TILE.floorShadowTop;
         else if (kindIs(x - 1, y, 'void') || kindIs(x - 1, y, 'wall')) f = INTERIOR_TILE.floorShadowLeft;
         else if (kindIs(x + 1, y, 'void') || kindIs(x + 1, y, 'wall')) f = INTERIOR_TILE.floorShadowRight;
-        interior.putTileAt(GID.interior + f, x, y);
+        interior.putTileAt(GID.interior + style + f, x, y);
       }
     }
 
@@ -249,13 +250,14 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
   const emissives: Phaser.GameObjects.Image[] = [];
   const lights: NightLight[] = [];
   const trees: Phaser.GameObjects.Sprite[] = [];
+  const animated: Array<{ sprite: Phaser.GameObjects.Sprite; frames: number; ms: number; phase: number }> = [];
   const propViews = new Map<PlacedProp, PropView>();
   for (const p of map.props) {
     const d = p.def;
     const jitter = d.jitter ? Math.round((hash2(p.cx, p.cy, seed + 3) - 0.5) * 2 * d.jitter) : 0;
     const x = p.cx * T + (d.footprint.w * T) / 2 + jitter + (d.offsetX ?? 0);
     const y = (p.cy + 1) * T + (d.offsetY ?? 0);
-    const frame = d.connects ? p.connections : d.sway ? 1 : 0;
+    const frame = d.connects ? p.connections : d.sway ? 1 : (d.frame ?? 0);
     const s = scene.add.sprite(x, y, d.texture, frame).setOrigin(0.5, 1);
     s.setDepth(d.flat ? DEPTH.groundDecor : worldDepth(y));
     objects.push(s);
@@ -267,6 +269,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
       objects.push(sh);
       view.extras.push(sh);
     }
+    if (d.anim) animated.push({ sprite: s, frames: d.anim.frames, ms: d.anim.ms, phase: Math.floor(hash2(p.cx, p.cy, 5) * d.anim.frames) });
     if (d.sway) {
       swayers.push({ sprite: s, x, slow: d.texture.includes('tree') });
       if (d.texture.includes('tree')) trees.push(s);
@@ -413,6 +416,10 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
         waterFrame = (waterFrame + 1) % WATER_FRAMES;
         for (const w of waterTiles) water.putTileAt(GID.water + waterFrame * WATER_TILES_PER_FRAME + w.tile, w.i, w.j);
         for (const w of seaTiles) sea.putTileAt(GID.sea + waterFrame * WATER_TILES_PER_FRAME + w.tile, w.i, w.j);
+      }
+      for (const a of animated) {
+        const f = (Math.floor(timeMs / a.ms) + a.phase) % a.frames;
+        if (a.sprite.active && a.sprite.frame.name !== String(f)) a.sprite.setFrame(f);
       }
       if (timeMs >= nextSway) {
         nextSway = timeMs + ATMOSPHERE.swayFrameMs / 3;
