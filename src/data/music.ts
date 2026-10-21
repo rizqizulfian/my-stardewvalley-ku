@@ -136,7 +136,7 @@ export const TRACKS: TrackDef[] = [
     // Recorded: "Apple Cider" by Zane Little. Farm daytime.
     kind: 'file',
     id: 'apple-cider',
-    url: '/audio/apple-cider.ogg',
+    url: 'audio/apple-cider.ogg',
     gain: 0.8,
     rainAlt: 'farm-day',
   },
@@ -144,7 +144,7 @@ export const TRACKS: TrackDef[] = [
     // The dancing dog's song, from the clip the project owner sent (source unknown, see CREDITS.md).
     kind: 'file',
     id: 'dog-dance',
-    url: '/audio/dog-dance.ogg',
+    url: 'audio/dog-dance.ogg',
     gain: 0.55,
   },
   {
