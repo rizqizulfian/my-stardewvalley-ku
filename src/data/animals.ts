@@ -1,7 +1,9 @@
 // The farm's animals: who they are, where they roam (cells, inclusive) and
 // what they give. Hens and ducks lay an egg on the ground each morning; the
 // cows give milk and the sheep wool when you pet them. At night and on wet
-// days they stay in the barn (Oyen the cat stays by the house).
+// days they stay in the barn (Oyen the cat stays by the house). Mofu, the
+// pet in a shark-hood costume, potters about in front of the house and goes
+// indoors at night and when the weather turns.
 
 import type { AnimalKind } from '../art/farm';
 import { TIME } from '../config';
@@ -24,12 +26,26 @@ export interface AnimalDef {
   lays?: string;
   /** Gives this item when petted, every `every` days. */
   gives?: { item: string; every: number };
+  /** A pet with its own home: goes in there (instead of the barn) at night and on wet days. */
+  home?: PetHome;
+}
+
+export interface PetHome {
+  map: string;
+  area: CellArea;
+  /** Heads in from this minute and comes out again the next morning. */
+  fromMinute: number;
+  /** The cell in front of the door on each side. */
+  doors: Record<string, { x: number; y: number }>;
 }
 
 const PASTURE = { x0: 31, y0: 22, x1: 45, y1: 31 };
 const COOP = { x0: 31, y0: 21, x1: 39, y1: 31 };
 const POND = { x0: 37, y0: 24, x1: 45, y1: 31 };
 const PORCH = { x0: 2, y0: 12, x1: 15, y1: 16 };
+const FRONT_YARD = { x0: 3, y0: 12, x1: 10, y1: 15 };
+/** Inside the farmhouse: the open floor between the bed and the table. */
+const HOUSE_FLOOR = { x0: 2, y0: 5, x1: 11, y1: 9 };
 
 /** The barn: its interior map, the cells in front of each door, and the indoor runs. */
 export const BARN = {
@@ -50,6 +66,7 @@ export const ANIMAL_INFO: Record<AnimalKind, { speed: number; sound: string; lov
   cat: { speed: 24, sound: 'meow', love: 'purrs and rubs against your leg.' },
   sheep: { speed: 12, sound: 'baa', love: 'leans into your hand. So soft!' },
   cow: { speed: 10, sound: 'moo', love: 'gives a slow, happy moo.' },
+  mofusand: { speed: 18, sound: 'meow', love: 'squishes its cheeks into your hand. Nyaa~' },
 };
 
 export const ANIMALS: AnimalDef[] = [
@@ -66,10 +83,23 @@ export const ANIMALS: AnimalDef[] = [
   { id: 'mimi', name: 'Mimi', kind: 'cow', map: 'farm', area: PASTURE, gives: { item: 'susu', every: 1 } },
   { id: 'belang', name: 'Belang', kind: 'cow', map: 'farm', area: PASTURE, gives: { item: 'susu', every: 1 } },
   { id: 'oyen', name: 'Oyen', kind: 'cat', map: 'farm', area: PORCH },
+  // Fan tribute to mofusand by juno (see CREDITS.md). Swap the look in art/farm.ts (mofusand()).
+  {
+    id: 'mofu',
+    name: 'Mofu',
+    kind: 'mofusand',
+    map: 'farm',
+    area: FRONT_YARD,
+    home: { map: 'house', area: HOUSE_FLOOR, fromMinute: 20 * 60, doors: { farm: { x: 6, y: 12 }, house: { x: 6, y: 10 } } },
+  },
 ];
 
 /** Where an animal is at this time: its outdoor run, or inside the barn. */
 export function animalPlace(a: AnimalDef, minute: number, weather: Weather): { map: string; area: CellArea } {
+  if (a.home) {
+    const home = weather !== 'sun' || minute >= a.home.fromMinute || minute < TIME.dayStartMinute;
+    return home ? { map: a.home.map, area: a.home.area } : { map: a.map, area: a.area };
+  }
   const inside = a.kind !== 'cat' && (weather !== 'sun' || minute >= BARN.homeMinute || minute < TIME.dayStartMinute);
   if (!inside) return { map: a.map, area: a.area };
   return { map: BARN.map, area: a.kind === 'chicken' || a.kind === 'duck' ? BARN.coop : BARN.stalls };

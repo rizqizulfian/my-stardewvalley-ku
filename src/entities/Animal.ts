@@ -5,7 +5,7 @@
 
 import Phaser from 'phaser';
 import { DEPTH, RENDER } from '../config';
-import { ANIMAL_FRAMES, ANIMAL_SIZE, animalTexture } from '../art/farm';
+import { ANIMAL_FRAMES, ANIMAL_SIZE, ANIMAL_SLEEP_FRAME, animalTexture } from '../art/farm';
 import { EMOTE, FX_TEXTURES } from '../art/fx';
 import { PROP_TEXTURES } from '../art/props';
 import { ANIMAL_INFO, type AnimalDef, type CellArea } from '../data/animals';
@@ -222,7 +222,8 @@ export class Animal {
       }
     }
     const frames = walking ? ANIMAL_FRAMES.walk : ANIMAL_FRAMES.idle;
-    const frame = this.sleepy && !walking ? frames[0] : frames[Math.floor(this.anim / (walking ? WALK_FRAME_MS : IDLE_FRAME_MS)) % frames.length];
+    const asleep = this.sleepy && !walking && this.emoteT <= 0;
+    const frame = asleep ? (ANIMAL_SLEEP_FRAME[this.def.kind] ?? frames[0]) : frames[Math.floor(this.anim / (walking ? WALK_FRAME_MS : IDLE_FRAME_MS)) % frames.length];
     if (this.sprite.frame.name !== String(frame)) this.sprite.setFrame(frame);
     this.sync(walking);
   }
