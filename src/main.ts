@@ -9,6 +9,7 @@ import { UIScene } from './scenes/UIScene';
 import { WorldScene } from './scenes/WorldScene';
 import { state } from './systems/GameState';
 import { loadGame } from './systems/save';
+import { installTouchControls } from './ui/TouchControls';
 
 /** Whole-number zoom plus the native size that fills the window at that zoom. */
 function fitView(): { zoom: number; width: number; height: number } {
@@ -45,3 +46,6 @@ window.addEventListener('resize', () => {
 
 // Handy for debugging in the console, e.g. lembah.state.minute = 1200
 (window as unknown as { lembah: unknown }).lembah = { game, state, audio };
+
+// On-screen joystick and buttons for phones (no keyboard there).
+installTouchControls(game);

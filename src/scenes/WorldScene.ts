@@ -286,6 +286,8 @@ export class WorldScene extends Phaser.Scene {
     arrival = { x: w.tx, y: w.ty, face: w.face ?? this.player.facing };
     this.cameras.main.fadeOut(FADE_OUT_MS, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      // A new map brings its own music, even mid opening song.
+      audio.endOpening(false);
       state.mapId = w.to;
       this.scene.restart();
     });
@@ -477,6 +479,7 @@ export class WorldScene extends Phaser.Scene {
     audio.playSfx(passedOut ? 'bonk' : 'sleep', 0.8);
     this.cameras.main.fadeOut(passedOut ? PASS_OUT_FADE_MS : SLEEP_FADE_MS, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      audio.endOpening(false);
       const summary = endDay(state, passedOut);
       const home = MAPS.house;
       state.mapId = home.id;
@@ -517,7 +520,9 @@ export class WorldScene extends Phaser.Scene {
 
     // Aim, then keep swinging while the use button is held.
     const p = this.input.activePointer;
-    const pointerOk = active && !overHud(p.x, p.y);
+    // A lifted finger keeps its last position, so touch only aims while it is down.
+    const touchIdle = p.wasTouch && !p.isDown;
+    const pointerOk = active && !touchIdle && !overHud(p.x, p.y);
     const handsFree = active && !this.player.seated && !this.fishing.active && time > uiState.blockUntil;
     this.tools.enabled = handsFree;
     this.tools.aim(pointerOk && this.pointerInside(p) ? p : null);

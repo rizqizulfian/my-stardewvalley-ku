@@ -53,6 +53,9 @@ export interface FileTrackDef {
 
 export type TrackDef = GenerativeTrackDef | FileTrackDef;
 
+/** The first song a player hears each time they start playing. */
+export const OPENING_TRACK = 'apple-cider';
+
 export const TRACKS: TrackDef[] = [
   {
     // Bright and airy: music box over soft keys, no drums yet.
