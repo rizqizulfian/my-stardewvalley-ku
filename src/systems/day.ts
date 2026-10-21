@@ -2,10 +2,12 @@
 // withering) and how rested the player wakes up. Plain state; the scene does
 // the fade and the summary screen.
 
-import { NEEDS, SEASONS, TIME } from '../config';
+import { NEEDS, SEASONS, TIME, WEATHER } from '../config';
 import { CROPS, inSeason } from '../data/crops';
+import { LETTERS } from '../data/mail';
 import { advanceFarms } from './farming';
-import type { GameState } from './GameState';
+import { hearts } from './friendship';
+import type { GameState, Weather } from './GameState';
 import { sellShipped, type SaleLine } from './shipping';
 
 export interface DaySummary {
@@ -42,15 +44,36 @@ function witherOutOfSeason(s: GameState): number {
   return n;
 }
 
-export function endDay(s: GameState, passedOut: boolean): DaySummary {
+function rollWeather(s: GameState, rand: () => number): Weather {
+  if (s.daysPlayed < WEATHER.clearDays) return 'sun';
+  return rand() < WEATHER.rainChance[s.season] ? 'rain' : 'sun';
+}
+
+/** Letters for this morning go into the mailbox. */
+function deliverMail(s: GameState, newSeason: boolean): void {
+  const ctx = { newSeason, hearts: (npc: string) => hearts(s, npc) };
+  for (const l of LETTERS) {
+    const flag = `mail:${l.id}`;
+    if ((!l.repeat && s.flags[flag]) || s.mail.includes(l.id) || !l.when(s, ctx)) continue;
+    s.flags[flag] = true;
+    s.mail.push(l.id);
+  }
+}
+
+export function endDay(s: GameState, passedOut: boolean, rand: () => number = Math.random): DaySummary {
   const ended = { day: s.day, season: s.season };
   const { lines, total } = sellShipped(s);
   // Hours past midnight when the player went down.
   const lateHours = Math.max(0, (s.minute - 24 * 60) / 60);
 
-  advanceFarms(s);
   const newSeason = advanceCalendar(s);
+  s.daysPlayed++;
+  s.weather = s.tomorrow;
+  s.tomorrow = rollWeather(s, rand);
+  // Rain waters every field for the new day.
+  advanceFarms(s, s.weather === 'rain');
   const withered = newSeason ? witherOutOfSeason(s) : 0;
+  deliverMail(s, newSeason);
 
   const n = s.needs;
   n.energy = passedOut ? NEEDS.passOutEnergy : Math.round(NEEDS.max - lateHours * NEEDS.lateBedEnergyPerHour);

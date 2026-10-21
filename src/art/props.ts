@@ -107,6 +107,9 @@ function trunk(g: PixelGrid, x: number, top: number, bottom: number, width: numb
   g.stamp(outline(s, { steps: 2 }));
 }
 
+/** The texture of a fruit-bearing prop once its fruit is picked. */
+export const bareTexture = (key: string) => `${key}-bare`;
+
 function withSway(base: PixelGrid, swaying: PixelGrid, pivotY: number): PixelGrid[] {
   return [-1, 0, 1].map((a) => base.clone().stamp(a === 0 ? swaying : swaying.sway(a, pivotY)));
 }
@@ -114,7 +117,8 @@ function withSway(base: PixelGrid, swaying: PixelGrid, pivotY: number): PixelGri
 // ---------------------------------------------------------------------------
 // Trees
 
-function roundTree(fruit: boolean): PixelGrid[] {
+/** 'bare' is the fruit tree after picking: the same canopy without fruit. */
+function roundTree(fruit: 'none' | 'fruit' | 'bare'): PixelGrid[] {
   const W = 32;
   const H = 46;
   const base = new PixelGrid(W, H);
@@ -132,9 +136,9 @@ function roundTree(fruit: boolean): PixelGrid[] {
     { x: 11, y: 24, r: 6, ry: 5 },
     { x: 21, y: 24, r: 6, ry: 5 },
   ];
-  let top = canopy(W, H, clumps, RAMPS.foliage, fruit ? 902 : 901, 16, 15, 12);
+  let top = canopy(W, H, clumps, RAMPS.foliage, fruit === 'none' ? 901 : 902, 16, 15, 12);
   top = outline(top, { color: 'pine' });
-  if (fruit) {
+  if (fruit === 'fruit') {
     const r = rng(77);
     for (let i = 0; i < 9; i++) {
       const x = 5 + Math.floor(r() * 22);
@@ -645,8 +649,9 @@ function shadowEllipse(w: number, h: number): PixelGrid {
 // ---------------------------------------------------------------------------
 
 export function registerProps(sink: TextureSink): void {
-  sink.sheet(PROP_TEXTURES.treeRound, roundTree(false), 32, 46);
-  sink.sheet(PROP_TEXTURES.treeFruit, roundTree(true), 32, 46);
+  sink.sheet(PROP_TEXTURES.treeRound, roundTree('none'), 32, 46);
+  sink.sheet(PROP_TEXTURES.treeFruit, roundTree('fruit'), 32, 46);
+  sink.sheet(bareTexture(PROP_TEXTURES.treeFruit), roundTree('bare'), 32, 46);
   sink.sheet(PROP_TEXTURES.treeSlender, slenderTree(), 22, 46);
   sink.sheet(PROP_TEXTURES.bush, bush(false), 20, 16);
   sink.sheet(PROP_TEXTURES.bushBerry, bush(true), 20, 16);

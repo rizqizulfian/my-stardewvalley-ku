@@ -1,7 +1,7 @@
 // Ambience layers and how loud each is over the day (minute -> 0..1).
 // Maps scale these with their own `ambience` multipliers.
 
-export type AmbienceLayerId = 'birds' | 'crickets' | 'wind' | 'water' | 'waves' | 'gulls';
+export type AmbienceLayerId = 'birds' | 'crickets' | 'wind' | 'water' | 'waves' | 'gulls' | 'rain';
 
 export type Curve = ReadonlyArray<readonly [minute: number, level: number]>;
 
@@ -36,6 +36,11 @@ export const AMBIENCE_CURVES: Record<AmbienceLayerId, Curve> = {
     [1560, 1],
   ],
   waves: [
+    [360, 1],
+    [1560, 1],
+  ],
+  // Rain is switched on by the weather (an override), not by maps.
+  rain: [
     [360, 1],
     [1560, 1],
   ],

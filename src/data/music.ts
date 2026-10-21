@@ -47,6 +47,8 @@ export interface FileTrackDef {
   id: string;
   url: string;
   gain: number;
+  /** Generative track whose rain variant plays instead on rainy days. */
+  rainAlt?: string;
 }
 
 export type TrackDef = GenerativeTrackDef | FileTrackDef;
@@ -136,6 +138,7 @@ export const TRACKS: TrackDef[] = [
     id: 'apple-cider',
     url: '/audio/apple-cider.ogg',
     gain: 0.8,
+    rainAlt: 'farm-day',
   },
   {
     // Village by day: marimba and bells, a little like a gamelan heard from a yard.
@@ -277,4 +280,73 @@ export const TRACKS: TrackDef[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Variants: every generative track gets a summer, fall, winter and rain take
+// (same harmony, new melody seed, different voices, tempo and warmth).
+
+type Variant = 'summer' | 'fall' | 'winter' | 'rain';
+const SEASON_VARIANT: Array<Variant | null> = [null, 'summer', 'fall', 'winter'];
+
+function variant(t: GenerativeTrackDef, v: Variant): GenerativeTrackDef {
+  const m = t.melody;
+  const d = t.drums;
+  switch (v) {
+    case 'summer':
+      return {
+        ...t,
+        id: `${t.id}@summer`,
+        seed: t.seed + 101,
+        bpm: t.bpm + 4,
+        lowpass: t.lowpass + 600,
+        melody: m && { ...m, voice: m.voice === 'marimba' ? 'pluck' : 'marimba', density: Math.min(0.6, m.density + 0.05) },
+        drums: d && { ...d, shaker: Math.min(0.7, d.shaker + 0.2) },
+      };
+    case 'fall':
+      return {
+        ...t,
+        id: `${t.id}@fall`,
+        seed: t.seed + 202,
+        bpm: t.bpm - 4,
+        lowpass: Math.round(t.lowpass * 0.8),
+        vinyl: Math.min(0.6, t.vinyl + 0.1),
+        melody: m && { ...m, voice: m.voice === 'epiano' ? 'pluck' : 'epiano' },
+      };
+    case 'winter':
+      return {
+        ...t,
+        id: `${t.id}@winter`,
+        seed: t.seed + 303,
+        bpm: t.bpm - 8,
+        lowpass: Math.round(t.lowpass * 0.7),
+        reverb: Math.min(0.7, t.reverb + 0.15),
+        melody: m && { ...m, voice: m.voice === 'bell' ? 'musicBox' : 'bell', density: m.density * 0.8 },
+        drums: d && { ...d, kick: 0, pattern: 'sparse' },
+      };
+    case 'rain':
+      return {
+        ...t,
+        id: `${t.id}@rain`,
+        seed: t.seed + 404,
+        bpm: t.bpm - 6,
+        lowpass: Math.round(t.lowpass * 0.6),
+        reverb: Math.min(0.7, t.reverb + 0.1),
+        vinyl: Math.min(0.6, t.vinyl + 0.15),
+        melody: m && { ...m, voice: 'epiano', density: m.density * 0.6 },
+        drums: d && { ...d, kick: d.kick * 0.5, hat: d.hat * 0.6, pattern: 'brush' },
+      };
+  }
+}
+
+for (const t of [...TRACKS])
+  if (t.kind === 'generative') for (const v of ['summer', 'fall', 'winter', 'rain'] as Variant[]) TRACKS.push(variant(t, v));
+
 export const TRACKS_BY_ID: Record<string, TrackDef> = Object.fromEntries(TRACKS.map((t) => [t.id, t]));
+
+/** The take of a map's track for this season and weather. */
+export function musicFor(id: string, season: number, raining: boolean): string {
+  const t = TRACKS_BY_ID[id];
+  if (!t) return id;
+  if (raining) return t.kind === 'generative' ? `${id}@rain` : t.rainAlt ? `${t.rainAlt}@rain` : id;
+  const v = SEASON_VARIANT[season];
+  return v && t.kind === 'generative' ? `${id}@${v}` : id;
+}

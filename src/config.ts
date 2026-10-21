@@ -51,6 +51,13 @@ export const TIME = {
 
 export const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
 
+export const WEATHER = {
+  /** Chance that a day is rainy, per season. */
+  rainChance: [0.25, 0.2, 0.3, 0.15],
+  /** The first days are always clear, so the farm can get started. */
+  clearDays: 2,
+} as const;
+
 /**
  * Body needs, all on a 0..100 scale where 100 is good. Drains are per game
  * minute; costs are per tool swing. "sleep" is alertness: it falls through the

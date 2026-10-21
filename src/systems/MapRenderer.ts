@@ -73,6 +73,8 @@ export interface RenderedMap {
   clearDecor(cx: number, cy: number): void;
   /** A short sideways shake, for tool hits. */
   shakeProp(p: PlacedProp, strength?: number): void;
+  /** Swaps a prop's texture (same frames), e.g. a fruit tree after picking. */
+  setPropTexture(p: PlacedProp, texture: string): void;
   update(timeMs: number): void;
   destroy(): void;
 }
@@ -400,6 +402,10 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
           if (v.sprite.active) v.sprite.x = v.baseX + steps[i++];
         },
       });
+    },
+    setPropTexture(p: PlacedProp, texture: string) {
+      const v = propViews.get(p);
+      if (v && v.sprite.texture.key !== texture) v.sprite.setTexture(texture, v.sprite.frame.name);
     },
     update(timeMs: number) {
       if (timeMs >= nextWater) {

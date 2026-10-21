@@ -38,6 +38,8 @@ export class ToolController {
   onUseProp: (p: PlacedProp) => boolean = () => false;
   /** The action button near a villager, given the point in front of the player. Returns true if handled. */
   onTalk: (px: number, py: number) => boolean = () => false;
+  /** Picks up forage on a cell. */
+  onPickup: (cx: number, cy: number) => boolean = () => false;
   /** Using the fishing rod. */
   onCast: () => boolean = () => false;
 
@@ -137,6 +139,7 @@ export class ToolController {
     if (!this.enabled || this.player.busy) return false;
     const { cx, cy } = this.target;
     if (this.mouseAim) this.player.face(cx * T + T / 2, cy * T + T / 2);
+    if (this.onPickup(cx, cy)) return true;
     if (this.ripeAt(cx, cy) && selectedStack(this.state)?.id !== 'scythe') return this.harvestAt(cx, cy);
 
     const st = selectedStack(this.state);
@@ -159,6 +162,7 @@ export class ToolController {
     const fx = this.player.x + (f === 'right' ? r : f === 'left' ? -r : 0);
     const fy = this.player.y - PLAYER.feetHeight / 2 + (f === 'down' ? r : f === 'up' ? -r : 0) - 4;
     if (this.mouseAim ? this.onTalk(cx * T + T / 2, cy * T + T / 2) : this.onTalk(fx, fy)) return true;
+    if (this.onPickup(cx, cy) || (!this.mouseAim && this.onPickup(this.facingCell().cx, this.facingCell().cy))) return true;
     if (this.ripeAt(cx, cy)) {
       if (this.mouseAim) this.player.face(cx * T + T / 2, cy * T + T / 2);
       return this.harvestAt(cx, cy);

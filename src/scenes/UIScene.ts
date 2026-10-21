@@ -11,6 +11,7 @@ import { ClockPanel } from '../ui/ClockPanel';
 import { DaySummaryView } from '../ui/DaySummary';
 import { DialogBox, type DialogRequest } from '../ui/DialogBox';
 import { NeedsPanel } from '../ui/NeedsPanel';
+import { SettingsMenu } from '../ui/SettingsMenu';
 import { ShopMenu } from '../ui/ShopMenu';
 import { Hotbar } from '../ui/Hotbar';
 import { InventoryMenu } from '../ui/InventoryMenu';
@@ -29,8 +30,8 @@ const PROMPT = {
 /** Controls reminder in the top-left; fades after a while, H brings it back. */
 const HELP = {
   lines: [
-    'WASD walk   Click/Space use tool or eat   X/Right-click pick, talk, sit, sleep',
-    '1-0 or wheel: choose item   E backpack   M mute',
+    'WASD walk   Click/Space use tool, eat, reel   X/Right-click pick, talk, sit, read',
+    '1-0 or wheel: choose item   E backpack   M mute   Esc settings',
     `hold ${DEBUG.fastForwardKey} fast time   ${DEBUG.nextDayKey} next day   H hide help`,
   ],
   showMs: 25000,
@@ -47,6 +48,7 @@ export class UIScene extends Phaser.Scene {
   private needs!: NeedsPanel;
   private dialog!: DialogBox;
   private shop!: ShopMenu;
+  private settings!: SettingsMenu;
   private summary!: DaySummaryView;
   private prompt: Phaser.GameObjects.Container | null = null;
   private started = false;
@@ -83,6 +85,11 @@ export class UIScene extends Phaser.Scene {
     this.notice = new Notice(this);
     this.menu = new InventoryMenu(this, state);
     this.shop = new ShopMenu(this, state);
+    this.settings = new SettingsMenu(this, state);
+    this.settings.onNewFarm = () => {
+      this.newFarm();
+      this.syncModal();
+    };
     this.dialog = new DialogBox(this);
     this.summary = new DaySummaryView(this);
     const refreshInv = () => {
@@ -127,7 +134,7 @@ export class UIScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     const toggleMenu = () => {
-      if (!this.started || this.dialog.isOpen || this.summary.isOpen) return;
+      if (!this.started || this.dialog.isOpen || this.summary.isOpen || this.settings.isOpen) return;
       if (this.shop.isOpen) this.shop.close();
       else if (this.menu.isOpen) this.menu.close();
       else this.menu.open();
@@ -139,12 +146,30 @@ export class UIScene extends Phaser.Scene {
       if (this.dialog.isOpen) this.dialog.close(-1);
       else if (this.shop.isOpen) this.shop.close();
       else if (this.menu.isOpen) this.menu.close();
+      else if (this.settings.isOpen) this.settings.close();
+      else if (this.started && !this.summary.isOpen) this.settings.open();
       this.syncModal();
     });
     // Dialog: advance with Space / Enter / X / F, choose with the arrows or WASD.
     for (const k of ['SPACE', 'ENTER', 'X', 'F']) kb.on(`keydown-${k}`, () => this.dialog.isOpen && (this.dialog.advance(), this.syncModal()));
     for (const k of ['LEFT', 'UP', 'A', 'W']) kb.on(`keydown-${k}`, () => this.dialog.move(-1));
     for (const k of ['RIGHT', 'DOWN', 'D', 'S']) kb.on(`keydown-${k}`, () => this.dialog.move(1));
+    // Settings: up/down pick a row, left/right change it, Enter/Space/X use it.
+    const inSettings = () => this.settings.isOpen && !this.dialog.isOpen;
+    for (const [keys, fn] of [
+      [['UP', 'W'], () => this.settings.move(-1)],
+      [['DOWN', 'S'], () => this.settings.move(1)],
+      [['LEFT', 'A'], () => this.settings.change(-1)],
+      [['RIGHT', 'D'], () => this.settings.change(1)],
+      [['SPACE', 'ENTER', 'X'], () => this.settings.activate()],
+    ] as Array<[string[], () => void]>)
+      for (const k of keys)
+        kb.on(`keydown-${k}`, () => {
+          if (!inSettings()) return;
+          fn();
+          this.syncModal();
+        });
+    kb.on('keydown-M', () => this.settings.refresh());
     kb.on('keydown', () => {
       if (this.summary.isOpen) this.summary.finish();
     });
@@ -160,6 +185,7 @@ export class UIScene extends Phaser.Scene {
       this.needs.layout(this.scale.width);
       this.dialog.layout(this.scale.width, this.scale.height);
       this.shop.layout(this.scale.width, this.scale.height);
+      this.settings.layout(this.scale.width, this.scale.height);
       this.summary.layout(this.scale.width, this.scale.height);
       const hb = this.hotbar.layout(this.scale.width, this.scale.height);
       uiState.hudRects = [hb];
@@ -181,7 +207,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private anyModal(): boolean {
-    return this.menu.isOpen || this.shop.isOpen || this.dialog.isOpen || this.summary.isOpen;
+    return this.menu.isOpen || this.shop.isOpen || this.dialog.isOpen || this.summary.isOpen || this.settings.isOpen;
   }
 
   /** One place decides whether the world is paused and which HUD shows. */
@@ -190,10 +216,19 @@ export class UIScene extends Phaser.Scene {
     if (this.wasModal && !modal) uiState.blockUntil = this.time.now + 200;
     this.wasModal = modal;
     uiState.menuOpen = modal;
-    const fullscreen = this.menu.isOpen || this.shop.isOpen || this.summary.isOpen;
+    const fullscreen = this.menu.isOpen || this.shop.isOpen || this.summary.isOpen || this.settings.isOpen;
     this.hotbar.setVisible(this.started && !fullscreen);
     this.needs.setVisible(this.started && !this.summary.isOpen);
     bus.emit(EV.menu, modal);
+  }
+
+  /** Erase the save and start over on day one. */
+  private newFarm(): void {
+    clearSave();
+    Object.assign(state, newGameState());
+    this.scene.get('World').scene.restart();
+    this.clock.update(state);
+    bus.emit(EV.inventoryChanged);
   }
 
   private centerPrompt(box: Phaser.GameObjects.Container): void {
@@ -247,12 +282,7 @@ export class UIScene extends Phaser.Scene {
           pages: ['Start a new farm? This erases your saved game.'],
           choices: ['Keep my farm', 'Start over'],
           onChoose: (i) => {
-            if (i !== 1) return;
-            clearSave();
-            Object.assign(state, newGameState());
-            this.scene.get('World').scene.restart();
-            this.clock.update(state);
-            bus.emit(EV.inventoryChanged);
+            if (i === 1) this.newFarm();
           },
         });
         return;

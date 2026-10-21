@@ -60,6 +60,8 @@ export interface GameState {
   tomorrow: Weather;
   /** Forage lying around today, per map. */
   forage: Record<string, ForageSpot[]>;
+  /** daysPlayed the forage above was spawned for. */
+  forageDay: number;
   /** Fruit picked per map: prop anchor cell -> daysPlayed when picked. */
   picked: Record<string, Record<number, number>>;
   /** Letters waiting in the mailbox (ids from data/mail.ts). */
@@ -116,6 +118,7 @@ export function newGameState(): GameState {
     weather: 'sun',
     tomorrow: 'sun',
     forage: {},
+    forageDay: 0,
     picked: {},
     mail: [],
     fishCaught: 0,

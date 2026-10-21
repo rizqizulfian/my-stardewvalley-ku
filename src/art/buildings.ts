@@ -6,7 +6,7 @@
 import { PixelGrid, blobMask, hash2, outline, shade, type ShadeOptions, type TextureSink } from './pixel';
 import { RAMPS, type ColorName, type Ramp } from './palette';
 import { textGrid } from './font';
-import { house, type HouseStyle } from './props';
+import { bareTexture, house, type HouseStyle } from './props';
 
 export const BUILDING_TEXTURES = {
   houseBlue: 'prop-house-blue',
@@ -264,7 +264,7 @@ function warung(): PixelGrid {
 // ---------------------------------------------------------------------------
 // Beach
 
-function palmFrames(): PixelGrid[] {
+function palmFrames(coconuts = true): PixelGrid[] {
   const W = 44;
   const H = 60;
   const base = new PixelGrid(W, H);
@@ -307,12 +307,13 @@ function palmFrames(): PixelGrid[] {
   }
   top.set(crownX, crownY - 1, 'lime').set(crownX - 1, crownY - 2, 'lime');
   // Coconuts.
-  for (const [x, y] of [
+  if (coconuts)
+    for (const [x, y] of [
     [22, 18],
     [25, 19],
-    [23, 20],
-  ])
-    top.fillEllipse(x - 1, y - 1, 3, 3, 'umber').set(x - 1, y - 1, 'clay');
+      [23, 20],
+    ])
+      top.fillEllipse(x - 1, y - 1, 3, 3, 'umber').set(x - 1, y - 1, 'clay');
   return swayFrames(base, top, H - 10);
 }
 
@@ -387,7 +388,7 @@ function umbrella(): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
-function bananaFrames(): PixelGrid[] {
+function bananaFrames(bunch = true): PixelGrid[] {
   const W = 44;
   const H = 54;
   const base = new PixelGrid(W, H);
@@ -429,7 +430,7 @@ function bananaFrames(): PixelGrid[] {
     }
   }
   // Bunch of bananas with the purple heart hanging below.
-  for (let r = 0; r < 3; r++)
+  for (let r = 0; r < (bunch ? 3 : 0); r++)
     for (let i = 0; i < 4 - r; i++) {
       const x = 24 + i * 2 - r;
       const y = 27 + r * 3;
@@ -718,6 +719,7 @@ export function registerBuildings(sink: TextureSink): void {
   sink.image(BUILDING_TEXTURES.barrel, barrel());
   sink.image(BUILDING_TEXTURES.crate, crate());
   sink.sheet(BUILDING_TEXTURES.palm, palmFrames(), 44, 60);
+  sink.sheet(bareTexture(BUILDING_TEXTURES.palm), palmFrames(false), 44, 60);
   sink.image(BUILDING_TEXTURES.boat, boat());
   sink.image(BUILDING_TEXTURES.hut, hut());
   sink.image(BUILDING_TEXTURES.umbrella, umbrella());
@@ -736,6 +738,7 @@ export function registerBuildings(sink: TextureSink): void {
   sink.image(BUILDING_TEXTURES.floorLampLit, floorLamp(true));
   sink.image(BUILDING_TEXTURES.doormat, doormat());
   sink.sheet(BUILDING_TEXTURES.banana, bananaFrames(), 44, 54);
+  sink.sheet(bareTexture(BUILDING_TEXTURES.banana), bananaFrames(false), 44, 54);
   sink.sheet(BUILDING_TEXTURES.hibiscus, hibiscusFrames(), 22, 20);
   sink.sheet(BUILDING_TEXTURES.flowerBed, flowerBedFrames(), 18, 14);
   sink.image(BUILDING_TEXTURES.fruitStall, fruitStall());

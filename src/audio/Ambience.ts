@@ -251,6 +251,52 @@ class Gulls extends BaseLayer {
   }
 }
 
+/** Rain: a hissing bed, a soft low roar, and drops ticking on leaves and roofs. */
+class Rain extends BaseLayer {
+  private next = 0;
+
+  constructor(id: AmbienceLayerId, ctx: BaseAudioContext, dest: AudioNode, reverb?: AudioNode) {
+    super(id, ctx, dest, reverb);
+    for (const [type, freq, q, gain] of [
+      ['highpass', 2400, 0.5, 0.05],
+      ['bandpass', 700, 0.5, 0.07],
+    ] as Array<[BiquadFilterType, number, number, number]>) {
+      const src = noiseSource(ctx, ctx.currentTime, 0, true);
+      const f = ctx.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = q;
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      src.connect(f).connect(g).connect(this.gain);
+    }
+  }
+
+  schedule(now: number, horizon: number): void {
+    if (this.next < now) this.next = now + 0.05;
+    while (this.next < horizon) {
+      if (this.level > 0.05) this.drop(this.next);
+      this.next += 0.02 + Math.random() * 0.12;
+    }
+  }
+
+  private drop(t: number): void {
+    const ctx = this.ctx;
+    const n = noiseSource(ctx, t, 0.03);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800 + Math.random() * 3500;
+    bp.Q.value = 6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.02 + Math.random() * 0.03, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = Math.random() * 1.6 - 0.8;
+    n.connect(bp).connect(g).connect(pan).connect(this.gain);
+  }
+}
+
 export function createAmbienceLayers(ctx: BaseAudioContext, dest: AudioNode, reverb?: AudioNode): AmbienceLayer[] {
   return [
     new Birds('birds', ctx, dest, reverb),
@@ -259,5 +305,6 @@ export function createAmbienceLayers(ctx: BaseAudioContext, dest: AudioNode, rev
     new NoiseBed('water', ctx, dest, { freq: 900, q: 0.9, gain: 0.05, drift: 0.5, swell: 0.6, period: 1.6 }),
     new Waves('waves', ctx, dest, reverb),
     new Gulls('gulls', ctx, dest, reverb),
+    new Rain('rain', ctx, dest, reverb),
   ];
 }

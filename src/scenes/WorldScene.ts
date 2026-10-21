@@ -4,13 +4,19 @@ import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
 import { PLAYER_CHARACTER } from '../data/characters';
 import type { Facing } from '../art/characters';
+import { FX_TEXTURES, EMOTE } from '../art/fx';
+import { letter } from '../data/mail';
 import { MAPS } from '../data/maps';
+import { musicFor } from '../data/music';
 import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
 import { Player } from '../entities/Player';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
 import { Fishing } from '../systems/Fishing';
+import { ensureForage } from '../systems/forage';
+import { Gathering } from '../systems/Gathering';
+import { Weather } from '../systems/Weather';
 import { NpcSystem } from '../systems/NpcSystem';
 import { EV, bus } from '../systems/events';
 import { soilOf } from '../systems/farming';
@@ -21,7 +27,7 @@ import { addItem, itemDef, selectSlot, selectedStack } from '../systems/Inventor
 import { addNeed, walkFactor } from '../systems/needs';
 import { saveGame } from '../systems/save';
 import { canShip, shipSlot } from '../systems/shipping';
-import { renderMap, type RenderedMap } from '../systems/MapRenderer';
+import { renderMap, worldDepth, type RenderedMap } from '../systems/MapRenderer';
 import { TimeSystem, formatClock, timeOfDay } from '../systems/TimeSystem';
 import { ToolController } from '../systems/ToolController';
 import { overHud, uiState } from '../systems/uiState';
@@ -71,6 +77,9 @@ export class WorldScene extends Phaser.Scene {
   private tools!: ToolController;
   private npcs!: NpcSystem;
   private fishing!: Fishing;
+  private gather!: Gathering;
+  private weather!: Weather;
+  private mailFlag: Phaser.GameObjects.Image | null = null;
   private camX = 0;
   private camY = 0;
   private started = false;
@@ -101,6 +110,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.time2 = new TimeSystem(state);
     this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor);
+    this.weather = new Weather(this, state.weather === 'rain', !!this.def.indoor);
     this.fx = new Effects(this);
     this.fx.collect = (id, qty) => {
       const left = addItem(state, id, qty);
@@ -112,6 +122,17 @@ export class WorldScene extends Phaser.Scene {
     this.npcs = new NpcSystem(this, this.map, state, this.fx);
     this.player.blocked = (b) => this.npcs.blocked(b);
     this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
+    ensureForage(state);
+    this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
+    this.tools.onPickup = (cx, cy) => this.gather.pickUp(cx, cy);
+    this.npcs.setRaining(state.weather === 'rain' && !this.def.indoor);
+    const box = this.map.props.find((p) => p.def.use === 'mailbox');
+    if (box) {
+      const [mx, my] = this.propCenter(box);
+      this.mailFlag = this.add.image(mx, my - 22, FX_TEXTURES.emote, EMOTE.alert).setDepth(worldDepth(my + 8) + 1);
+      this.tweens.add({ targets: this.mailFlag, y: my - 25, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', onUpdate: () => this.mailFlag?.setY(Math.round(this.mailFlag.y)) });
+      this.refreshMailFlag();
+    }
     this.tools.onCast = () => this.fishing.cast();
     this.tools.onTalk = (px, py) => {
       const n = this.npcs.at(px, py);
@@ -184,6 +205,9 @@ export class WorldScene extends Phaser.Scene {
       this.input.off('pointerdown');
       this.input.off('wheel');
       this.fishing.destroy();
+      this.gather.destroy();
+      this.weather.destroy();
+      this.mailFlag = null;
       this.npcs.destroy();
       this.fx.destroy();
       this.tools.destroy();
@@ -202,7 +226,11 @@ export class WorldScene extends Phaser.Scene {
 
   private onStarted(): void {
     this.started = true;
-    audio.playMusic(this.def.music[timeOfDay(state.minute)]);
+    this.playMusic();
+  }
+
+  private playMusic(): void {
+    audio.playMusic(musicFor(this.def.music[timeOfDay(state.minute)], state.season, state.weather === 'rain'));
   }
 
   /** Leave through an exit: fade out, switch map, restart the scene there. */
@@ -257,17 +285,55 @@ export class WorldScene extends Phaser.Scene {
       case 'ship':
         return this.ship(p);
       case 'mailbox':
-        dialog({ pages: ['No letters today.'] });
+        this.readMail();
         return true;
       case 'sign':
         dialog({ pages: [this.def.sign ?? 'The sign is too weathered to read.'] });
         return true;
       case 'board':
-        dialog({ pages: this.def.board ?? ['Nothing pinned up today.'] });
+        dialog({ pages: [...(this.def.board ?? ['Nothing pinned up today.']), `Weather tomorrow: ${state.tomorrow === 'rain' ? 'rain. No need to water!' : 'sunny.'}`] });
         return true;
+      case 'pick':
+        return this.pickFruit(p);
       default:
         return false;
     }
+  }
+
+  private refreshMailFlag(): void {
+    this.mailFlag?.setVisible(state.mail.length > 0);
+  }
+
+  /** Opens the oldest letter in the mailbox. */
+  private readMail(): void {
+    const id = state.mail.shift();
+    const l = id ? letter(id) : undefined;
+    this.refreshMailFlag();
+    if (!l) {
+      dialog({ pages: ['No letters today.'] });
+      return;
+    }
+    audio.playSfx('mail', 0.9);
+    const pages = [...l.pages];
+    if (l.item) pages.push(`(Something is tucked inside: ${l.item[1]} ${itemDef(l.item[0]).name}.)`);
+    dialog({
+      speaker: `Letter: ${l.from}`,
+      pages,
+      onClose: () => {
+        if (l.item) {
+          const left = addItem(state, l.item[0], l.item[1]);
+          if (left > 0) this.fx.drop(l.item[0], left, this.player.x, this.player.y + 6);
+        }
+        if (state.mail.length) bus.emit(EV.notice, `${state.mail.length} more letter${state.mail.length > 1 ? 's' : ''} in the mailbox.`);
+      },
+    });
+  }
+
+  private pickFruit(p: PlacedProp): boolean {
+    if (!this.gather.hasFruit(p)) return this.gather.pickFruit(p);
+    const [x, y] = this.propCenter(p);
+    this.player.face(x, y);
+    return this.player.act({ tool: null, frames: [140, 260], impact: 0, onImpact: () => this.gather.pickFruit(p) });
   }
 
   private openShop(id: string): boolean {
@@ -359,7 +425,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private onPeriod(): void {
-    audio.playMusic(this.def.music[timeOfDay(state.minute)]);
+    this.playMusic();
   }
 
   update(time: number, delta: number): void {
@@ -404,18 +470,25 @@ export class WorldScene extends Phaser.Scene {
         const [cx, cy] = ripe[Math.floor(Math.random() * ripe.length)];
         this.fx.burst('spark', cx * RENDER.tileSize + 4 + Math.random() * 8, cy * RENDER.tileSize + 8, { count: 1, spread: 2, up: 12, z: 6, gravity: 0, life: 700 });
       }
+      const g = this.gather.glint();
+      if (g && Math.random() < 0.5) this.fx.burst('spark', g[0] + Math.random() * 6 - 3, g[1], { count: 1, spread: 2, up: 10, z: 4, gravity: 0, life: 600 });
     }
 
     this.followCamera(delta);
     this.rendered.update(time);
     this.atmosphere.update(time, delta, state.minute);
+    this.weather.update(time, delta);
 
     if (time > this.nextAmbience) {
       this.nextAmbience = time + AMBIENCE_REFRESH_MS;
       const d = this.map.waterDistance(this.player.x, this.player.y);
       const water = Math.max(0, 1 - d / WATER_HEARING_CELLS);
       const waves = Math.max(WAVES_FLOOR, 1 - d / WAVES_HEARING_CELLS);
-      audio.updateAmbience(state.minute, this.def.ambience, { water, waves });
+      const rain = state.weather === 'rain';
+      const levels: Record<string, number> = rain
+        ? { ...this.def.ambience, birds: (this.def.ambience.birds ?? 0) * 0.15, gulls: (this.def.ambience.gulls ?? 0) * 0.3, crickets: 0, rain: this.def.indoor ? 0.35 : 1 }
+        : this.def.ambience;
+      audio.updateAmbience(state.minute, levels, { water, waves });
     }
   }
 

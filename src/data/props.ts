@@ -2,7 +2,7 @@
 // marks the bottom-left cell of the prop's footprint.
 
 import { BUILDING_TEXTURES as B } from '../art/buildings';
-import { PROP_TEXTURES } from '../art/props';
+import { PROP_TEXTURES, bareTexture } from '../art/props';
 import type { ToolKind } from './items';
 import type { Surface } from './terrain';
 
@@ -65,9 +65,25 @@ export interface PropDef {
   shakes?: boolean;
   /** What the action button does here (see WorldScene.useProp). */
   use?: PropUse;
+  /** Fruit the action button picks; it grows back after some days. */
+  pick?: PickDef;
 }
 
-export type PropUse = 'bed' | 'bench' | 'well' | 'ship' | 'mailbox' | 'board' | 'sign' | `shop:${string}`;
+export interface PickDef {
+  item: string;
+  min: number;
+  max: number;
+  regrowDays: number;
+  /** Texture shown while the fruit grows back. */
+  bare: string;
+}
+
+export type PropUse = 'bed' | 'bench' | 'well' | 'ship' | 'mailbox' | 'board' | 'sign' | 'pick' | `shop:${string}`;
+
+const fruit = (texture: string, item: string, min: number, max: number): Pick<PropDef, 'use' | 'pick'> => ({
+  use: 'pick',
+  pick: { item, min, max, regrowDays: 3, bare: bareTexture(texture) },
+});
 
 /** Village houses, the shop and the hall share the farmhouse's 5x3 footprint. */
 function houseLike(texture: string, lit: string): PropDef {
@@ -99,6 +115,7 @@ export const PROPS: Record<string, PropDef> = {
   },
   treeFruit: {
     texture: PROP_TEXTURES.treeFruit,
+    ...fruit(PROP_TEXTURES.treeFruit, 'jambu', 2, 3),
     shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 3, y: 9, w: 10, h: 6 },
@@ -247,6 +264,7 @@ export const PROPS: Record<string, PropDef> = {
   fountain: { texture: B.fountain, footprint: { w: 3, h: 2 }, collider: { x: 2, y: 10, w: 44, h: 20 }, sway: true, shadow: PROP_TEXTURES.shadowXL },
   banana: {
     texture: B.banana,
+    ...fruit(B.banana, 'pisang', 2, 4),
     shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 5, y: 10, w: 6, h: 5 },
@@ -260,6 +278,7 @@ export const PROPS: Record<string, PropDef> = {
   // Beach ---------------------------------------------------------------------
   palm: {
     texture: B.palm,
+    ...fruit(B.palm, 'kelapa', 1, 2),
     shakes: true,
     footprint: { w: 1, h: 1 },
     collider: { x: 5, y: 10, w: 6, h: 5 },
