@@ -131,12 +131,20 @@ export class AudioManager {
     return this.ctx;
   }
 
-  /** Must be called from a user gesture (key press or click). */
+  /**
+   * Must be called from a user gesture (key press or tap). On phones the tap
+   * that calls this may land on touchstart, which browsers do not count as a
+   * gesture for audio, so the context can stay suspended until a later input:
+   * every later key, tap or touch end resumes it (see resumeOnGesture).
+   */
   async unlock(): Promise<void> {
     if (this.ctx) {
       if (this.ctx.state !== 'running') await this.ctx.resume();
       return;
     }
+    // iOS: play through the ring/silent switch like a music app.
+    const session = (navigator as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
     const ctx = new AudioContext({ latencyHint: 'playback' });
     this.ctx = ctx;
 
@@ -181,12 +189,34 @@ export class AudioManager {
       if (document.hidden) void this.ctx.suspend();
       else void this.ctx.resume();
     });
-    await ctx.resume();
+    // Start the music now, not after resume(): on phones resume() may wait
+    // for the next gesture, and the track should simply begin when it does.
     if (this.pendingTrack) {
       const id = this.pendingTrack;
       this.pendingTrack = null;
       this.switchTo(id);
     }
+    await ctx.resume();
+  }
+
+  /**
+   * Resume a suspended context on any real gesture. Touch end and click count
+   * as gestures on iOS and Android where touchstart does not; capture phase so
+   * the on-screen controls cannot swallow it.
+   */
+  resumeOnGesture(): void {
+    const kick = () => {
+      const ctx = this.ctx;
+      if (!ctx || ctx.state === 'running' || document.hidden) return;
+      void ctx.resume();
+      // Old iOS only unlocks once a sound starts inside the gesture.
+      const s = ctx.createBufferSource();
+      s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      s.connect(ctx.destination);
+      s.start();
+    };
+    for (const type of ['pointerup', 'touchend', 'click', 'keydown'])
+      window.addEventListener(type, kick, { capture: true, passive: true });
   }
 
   // -------------------------------------------------------------------------
@@ -403,3 +433,4 @@ export class AudioManager {
 }
 
 export const audio = new AudioManager();
+audio.resumeOnGesture();
