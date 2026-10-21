@@ -282,6 +282,8 @@ export class WorldScene extends Phaser.Scene {
     arrival = { x: w.tx, y: w.ty, face: w.face ?? this.player.facing };
     this.cameras.main.fadeOut(FADE_OUT_MS, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      // A new map brings its own music, even mid opening song.
+      audio.endOpening(false);
       state.mapId = w.to;
       this.scene.restart();
     });
@@ -473,6 +475,7 @@ export class WorldScene extends Phaser.Scene {
     audio.playSfx(passedOut ? 'bonk' : 'sleep', 0.8);
     this.cameras.main.fadeOut(passedOut ? PASS_OUT_FADE_MS : SLEEP_FADE_MS, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      audio.endOpening(false);
       const summary = endDay(state, passedOut);
       const home = MAPS.house;
       state.mapId = home.id;
