@@ -438,7 +438,7 @@ function seaTile(mask: number, frame: number, variant = 0): PixelGrid {
 // ---------------------------------------------------------------------------
 // Interiors (per cell)
 
-type FloorStyle = 'wood' | 'paper' | 'marble';
+type FloorStyle = 'wood' | 'paper' | 'marble' | 'straw';
 
 function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right', style: FloorStyle = 'wood'): PixelGrid {
   const g = new PixelGrid(T, T);
@@ -462,6 +462,17 @@ function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right', s
     for (let i = 0; i < 2; i++) g.set(Math.floor(hash2(variant, i, 84) * T), Math.floor(hash2(variant, i, 85) * T), 'mist');
     dark = 'mist';
     darker = 'haze';
+  } else if (style === 'straw') {
+    // Packed earth strewn with straw.
+    for (let y = 0; y < T; y++)
+      for (let x = 0; x < T; x++) g.set(x, y, hash2(x + variant * 13, y, 87) < 0.18 ? 'umber' : 'clay');
+    for (let i = 0; i < 9; i++) {
+      const x = Math.floor(hash2(variant, i, 88) * T);
+      const y = Math.floor(hash2(variant, i, 89) * T);
+      const len = 2 + Math.floor(hash2(variant, i, 90) * 3);
+      const dir = hash2(variant, i, 91) < 0.5 ? 1 : -1;
+      for (let k = 0; k < len; k++) g.set((x + k) % T, (y + (k * dir + T)) % T, i % 3 ? 'sand' : 'gold');
+    }
   } else {
     // Polished stone: big pale slabs with thin grout and a soft sheen.
     for (let y = 0; y < T; y++)
@@ -507,8 +518,21 @@ function paperWalls(): PixelGrid[] {
   return [upper, lower, top];
 }
 
+/** A barn: rough vertical planks with a beam along the top. */
+function barnWalls(): PixelGrid[] {
+  const planks = new PixelGrid(T, T);
+  for (let y = 0; y < T; y++)
+    for (let x = 0; x < T; x++) {
+      const seam = x % 5 === 0;
+      planks.set(x, y, seam ? 'bark' : hash2(Math.floor(x / 5), y >> 2, 95) < 0.2 ? 'clay' : 'umber');
+    }
+  const lower = planks.clone().fillRect(0, T - 3, T, 1, 'clay').fillRect(0, T - 2, T, 2, 'bark');
+  const top = planks.clone().fillRect(0, 0, T, 3, 'bark').fillRect(0, 3, T, 1, 'clay');
+  return [planks, lower, top];
+}
+
 /** Interior colourways, in tileset order (each is INTERIOR_TILE.altOffset tiles). */
-export const INTERIOR_STYLES = ['home', 'shop', 'paper', 'gallery'] as const;
+export const INTERIOR_STYLES = ['home', 'shop', 'paper', 'gallery', 'barn'] as const;
 
 function interiorTiles(): PixelGrid[] {
   const v = new PixelGrid(T, T).fillRect(0, 0, T, T, 'ink');
@@ -535,6 +559,10 @@ function interiorTiles(): PixelGrid[] {
     // Gallery: deep red walls, dark wood dado, marble floor.
     ...floors('marble'),
     ...wallTiles(['wine', 'brick', 'coral'], ['bark', 'umber', 'gold'], ['night', 'plum']),
+    v,
+    // Barn: straw on packed earth, plank walls.
+    ...floors('straw'),
+    ...barnWalls(),
     v,
   ];
 }

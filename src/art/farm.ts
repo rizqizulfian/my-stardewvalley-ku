@@ -1,6 +1,8 @@
 // Phase 6 farm art: farm animals (chicken, duck, cat, sheep, cow), beehives,
-// the long hay barn, the windmill and a water trough.
+// the long hay barn, the animal barn (kandang) and its fittings, the windmill
+// and a water trough.
 
+import { textGrid } from './font';
 import { PixelGrid, blobMask, hash2, outline, shade, type ShadeOptions, type TextureSink } from './pixel';
 import { RAMPS, type ColorName, type Ramp } from './palette';
 
@@ -11,6 +13,10 @@ export const FARM_TEXTURES = {
   windmill: 'farm-windmill',
   trough: 'farm-trough',
   hayBale: 'farm-hay-bale',
+  animalBarn: 'farm-animal-barn',
+  animalBarnLit: 'farm-animal-barn-lit',
+  nestBox: 'farm-nest-box',
+  manger: 'farm-manger',
 } as const;
 
 export const animalTexture = (kind: AnimalKind) => `animal-${kind}`;
@@ -275,6 +281,100 @@ function hayBale(): PixelGrid {
 }
 
 // ---------------------------------------------------------------------------
+// The animal barn: a red gambrel barn with white trim, big cross-braced doors,
+// a hay loft and a little rooster vane. The lit version glows at night.
+
+function animalBarn(lit: boolean): PixelGrid {
+  const W = 112;
+  const H = 92;
+  const g = new PixelGrid(W, H);
+  const cx = W / 2;
+  // Half-width of the gambrel front at a given row.
+  const half = (y: number) => (y < 8 ? -1 : y < 20 ? Math.round((32 * (y - 8)) / 12) : y < 46 ? Math.round(32 + (18 * (y - 20)) / 26) : 50);
+  if (!lit) {
+    // Slate roof edge peeking over the gable.
+    const roof = new PixelGrid(W, H);
+    for (let y = 4; y < 50; y++) {
+      const h = half(y + 4) + 4;
+      if (h > 3) roof.fillRect(cx - h, y, h * 2, 1, 'ink');
+    }
+    g.stamp(shade(roof, ['night', 'plum', 'mauve'], { rim: 0.3, gradient: 0.5 }));
+    // Red plank front.
+    const front = new PixelGrid(W, H);
+    for (let y = 8; y < H - 6; y++) {
+      const h = half(y);
+      if (h > 0) front.fillRect(cx - h, y, h * 2, 1, 'ink');
+    }
+    const red = shade(front, ['wine', 'brick', 'coral'], { rim: 0.2, gradient: 0.4, dither: 0.3 });
+    red.forEachFilled((x, y) => {
+      if ((x - 6) % 6 === 0) red.set(x, y, 'wine');
+    });
+    g.stamp(red);
+    // White trim along the gable and down the corners.
+    for (let y = 8; y < 46; y++) {
+      const h = half(y);
+      if (h <= 0) continue;
+      g.fillRect(cx - h, y, 2, 1, 'cream').fillRect(cx + h - 2, y, 2, 1, 'cream');
+    }
+    g.fillRect(cx - 50, 46, 3, H - 52, 'cream').fillRect(cx + 47, 46, 3, H - 52, 'cream');
+    g.fillRect(cx - 50, 46, 100, 2, 'cream');
+    // Stone footing.
+    block(g, 5, H - 7, W - 10, 6, RAMPS.stone, { noise: 0.3, seed: 91 });
+    for (let x = 9; x < W - 8; x += 9) g.set(x, H - 5, 'plum').set(x + 4, H - 3, 'plum');
+    // Name board.
+    g.fillRect(cx - 22, 40, 44, 9, 'umber').fillRect(cx - 22, 40, 44, 1, 'clay');
+    g.stamp(textGrid('KANDANG', 'cream'), cx - 19, 41);
+    // Big double doors, cross-braced.
+    g.fillRect(cx - 19, 52, 38, H - 59, 'cream');
+    for (const dx of [cx - 17, cx + 1]) {
+      block(g, dx, 54, 16, H - 61, ['wine', 'brick', 'coral'], { gradient: 0.4 });
+      g.line(dx, 54, dx + 15, H - 8, 'cream').line(dx + 15, 54, dx, H - 8, 'cream');
+      g.fillRect(dx, 54, 16, 1, 'cream').fillRect(dx, H - 8, 16, 1, 'cream');
+    }
+    g.fillRect(cx - 1, 54, 2, H - 61, 'cream');
+    g.fillRect(cx - 4, 70, 2, 3, 'night').fillRect(cx + 2, 70, 2, 3, 'night');
+    // Rooster vane on the ridge.
+    g.fillRect(cx, 0, 1, 8, 'night');
+    g.fillRect(cx - 3, 1, 6, 2, 'night').set(cx + 3, 0, 'night').set(cx - 4, 0, 'night');
+  }
+  // Loft door with hay, and two small side windows.
+  const glass: ColorName = lit ? 'gold' : 'deep';
+  const glint: ColorName = lit ? 'cream' : 'sky';
+  if (!lit) g.fillRect(cx - 9, 20, 18, 16, 'cream');
+  g.fillRect(cx - 7, 22, 14, 13, lit ? 'amber' : 'night');
+  for (let x = cx - 7; x < cx + 7; x++) if (hash2(x, 3, 92) < 0.7) g.line(x, 34, x + (x % 2 ? 1 : -1), 31 - Math.floor(hash2(x, 4, 92) * 3), lit ? 'gold' : 'amber');
+  for (const wx of [14, W - 26]) {
+    if (!lit) g.fillRect(wx - 1, 55, 14, 13, 'cream');
+    g.fillRect(wx + 1, 57, 10, 9, glass).fillRect(wx + 6, 57, 1, 9, lit ? 'amber' : 'cream').fillRect(wx + 1, 61, 10, 1, lit ? 'amber' : 'cream');
+    g.set(wx + 2, 58, glint).set(wx + 3, 58, glint);
+  }
+  return lit ? g : outline(g, { steps: 2 });
+}
+
+/** A wooden nesting box full of straw, with a hen-sized hollow. */
+function nestBox(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  block(g, 1, 5, 14, 10, RAMPS.wood, { gradient: 0.5 });
+  block(g, 2, 3, 12, 5, RAMPS.straw, { dither: 0.5, noise: 0.4, seed: 93 });
+  g.fillEllipse(5, 4, 6, 3, 'amber');
+  g.line(2, 9, 13, 9, 'umber');
+  return outline(g, { steps: 2 });
+}
+
+/** A long wooden manger heaped with hay. */
+function manger(): PixelGrid {
+  const g = new PixelGrid(32, 16);
+  block(g, 1, 6, 30, 9, RAMPS.wood, { gradient: 0.5 });
+  for (let x = 3; x < 30; x++) {
+    const top = 2 + Math.round(Math.sin(x * 0.7) * 1.2 + hash2(x, 1, 94) * 2);
+    g.line(x, top, x, 7, hash2(x, 2, 94) < 0.3 ? 'gold' : 'amber');
+  }
+  g.fillRect(1, 9, 30, 1, 'umber');
+  for (const px of [2, 15, 28]) g.fillRect(px, 6, 2, 9, 'umber');
+  return outline(g, { steps: 2 });
+}
+
+// ---------------------------------------------------------------------------
 
 export function registerFarmArt(sink: TextureSink): void {
   for (const kind of Object.keys(ANIMAL_DRAW) as AnimalKind[]) {
@@ -287,4 +387,8 @@ export function registerFarmArt(sink: TextureSink): void {
   sink.sheet(FARM_TEXTURES.windmill, windmill(), WINDMILL.w, WINDMILL.h);
   sink.image(FARM_TEXTURES.trough, trough());
   sink.image(FARM_TEXTURES.hayBale, hayBale());
+  sink.image(FARM_TEXTURES.animalBarn, animalBarn(false));
+  sink.image(FARM_TEXTURES.animalBarnLit, animalBarn(true));
+  sink.image(FARM_TEXTURES.nestBox, nestBox());
+  sink.image(FARM_TEXTURES.manger, manger());
 }

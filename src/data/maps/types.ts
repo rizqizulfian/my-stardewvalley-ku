@@ -39,7 +39,7 @@ export interface MapDef {
   tillable?: boolean;
   /** Indoor maps: steady lighting, no sky effects. 'shop' picks the second wall colourway. */
   indoor?: boolean;
-  interiorStyle?: 'home' | 'shop' | 'paper' | 'gallery';
+  interiorStyle?: 'home' | 'shop' | 'paper' | 'gallery' | 'barn';
   /** Exits: stepping into the rectangle (cells) moves the player to another map. */
   warps?: WarpDef[];
   /** What signposts here say. */

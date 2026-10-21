@@ -206,6 +206,7 @@ export class WorldScene extends Phaser.Scene {
     const onMinute = () => {
       if (this.player.seated) addNeed(state, 'energy', NEEDS.benchEnergy);
       this.npcs.onMinute();
+      this.animals.onMinute();
     };
     bus.on(EV.farmChanged, onFarm);
     bus.on(EV.passOut, onPassOut);

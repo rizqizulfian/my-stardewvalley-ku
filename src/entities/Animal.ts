@@ -1,13 +1,14 @@
 // A farm animal: ambles to a random spot in its run, stands about, then picks
 // another. Ducks paddle into the pond (only their top half shows). Big animals
-// are solid; hens, ducks and the cat just step out of the way.
+// are solid; hens, ducks and the cat just step out of the way. Going in or out
+// of the barn, it walks to the door and fades away there.
 
 import Phaser from 'phaser';
 import { DEPTH, RENDER } from '../config';
 import { ANIMAL_FRAMES, ANIMAL_SIZE, animalTexture } from '../art/farm';
 import { EMOTE, FX_TEXTURES } from '../art/fx';
 import { PROP_TEXTURES } from '../art/props';
-import { ANIMAL_INFO, type AnimalDef } from '../data/animals';
+import { ANIMAL_INFO, type AnimalDef, type CellArea } from '../data/animals';
 import type { Box } from '../data/props';
 import { isWaterTerrain } from '../data/terrain';
 import { worldDepth } from '../systems/MapRenderer';
@@ -19,6 +20,8 @@ const WALK_FRAME_MS = 170;
 /** Stand still between strolls for this long (ms). */
 const PAUSE = { min: 1500, max: 5000, night: 9000 } as const;
 const STUCK_MS = 900;
+/** Leaving through a door: give up walking after this long and just go (ms). */
+const LEAVE = { maxMs: 40000, stuckMs: 2000, fadeMs: 350 } as const;
 /** How much of a swimming duck sinks below the water line (px). */
 const SINK = 5;
 
@@ -42,12 +45,16 @@ export class Animal {
   private hop = 0;
   /** Set by the system: lie low after dark. */
   sleepy = false;
+  /** On its way out through a door. */
+  private exit: { route: Array<{ x: number; y: number }>; t: number; fade: number; best: number; since: number; onGone: () => void } | null = null;
 
   constructor(
     scene: Phaser.Scene,
     private readonly map: WorldMap,
     readonly def: AnimalDef,
     start: { x: number; y: number },
+    /** The cells it wanders in. */
+    readonly area: CellArea,
   ) {
     this.size = ANIMAL_SIZE[def.kind];
     this.speed = ANIMAL_INFO[def.kind].speed;
@@ -87,6 +94,23 @@ export class Animal {
     return this.swims && isWaterTerrain(this.map.terrainAt(Math.floor(this.x / T), Math.floor((this.y - 2) / T)));
   }
 
+  get leaving(): boolean {
+    return this.exit !== null;
+  }
+
+  /** Walk a route (world px) to a door and disappear through it. */
+  leave(route: Array<{ x: number; y: number }>, onGone: () => void): void {
+    this.exit = { route: [...route], t: 0, fade: 0, best: Infinity, since: 0, onGone };
+    this.stuck = 0;
+  }
+
+  /** Coming in through a door: fade in while stepping inside. */
+  arrive(): void {
+    this.sprite.setAlpha(0);
+    this.pause = 0;
+    this.pickTarget();
+  }
+
   /** Heart (or a smaller reaction) and a little hop. */
   react(kind: keyof typeof EMOTE, faceX?: number): void {
     this.emote.setFrame(EMOTE[kind]).setVisible(true);
@@ -98,7 +122,7 @@ export class Animal {
   }
 
   private pickTarget(): void {
-    const a = this.def.area;
+    const a = this.area;
     // Ducks would rather be on the pond.
     const wantWater = this.swims && Math.random() < 0.6;
     for (let tries = 0; tries < 16; tries++) {
@@ -150,8 +174,39 @@ export class Animal {
       if (this.emoteT <= 0) this.emote.setVisible(false);
     }
     if (this.hop > 0) this.hop = Math.max(0, this.hop - deltaMs / 300);
+    if (this.sprite.alpha < 1 && !this.exit) this.setAlpha(Math.min(1, this.sprite.alpha + deltaMs / LEAVE.fadeMs));
     let walking = false;
-    if (this.target) {
+    const ex = this.exit;
+    if (ex) {
+      ex.t += deltaMs;
+      if (ex.fade > 0 || ex.t > LEAVE.maxMs) {
+        ex.fade += deltaMs;
+        this.setAlpha(Math.max(0, 1 - ex.fade / LEAVE.fadeMs));
+        if (ex.fade >= LEAVE.fadeMs) {
+          this.exit = null;
+          ex.onGone();
+          return;
+        }
+      } else {
+        this.target = ex.route[0];
+        // Filing through the door, they squeeze past each other.
+        const r = this.step(deltaMs / 1000, () => false);
+        walking = r === true;
+        // Not getting any closer counts as stuck.
+        const d = Math.hypot(ex.route[0].x - this.x, ex.route[0].y - this.y);
+        if (d < ex.best - 2) {
+          ex.best = d;
+          ex.since = 0;
+        } else ex.since += deltaMs;
+        // On to the next point, or through the door at the last one.
+        const done = r === 'arrived' || ex.since > LEAVE.stuckMs;
+        if (done && ex.route.length > 1) {
+          ex.route.shift();
+          ex.best = Infinity;
+          ex.since = 0;
+        } else if (done) ex.fade = 1;
+      }
+    } else if (this.target) {
       const r = this.step(deltaMs / 1000, blocked);
       walking = r === true;
       this.stuck = r === false ? this.stuck + deltaMs : 0;
@@ -170,6 +225,11 @@ export class Animal {
     const frame = this.sleepy && !walking ? frames[0] : frames[Math.floor(this.anim / (walking ? WALK_FRAME_MS : IDLE_FRAME_MS)) % frames.length];
     if (this.sprite.frame.name !== String(frame)) this.sprite.setFrame(frame);
     this.sync(walking);
+  }
+
+  private setAlpha(a: number): void {
+    this.sprite.setAlpha(a);
+    this.shadow.setAlpha(0.2 * a);
   }
 
   private sync(walking: boolean): void {

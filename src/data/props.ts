@@ -374,6 +374,21 @@ export const PROPS: Record<string, PropDef> = {
   },
   trough: { texture: FT.trough, footprint: { w: 2, h: 1 }, collider: { x: 2, y: 6, w: 28, h: 9 }, shadow: PROP_TEXTURES.shadowL },
   hayBale: { texture: FT.hayBale, footprint: { w: 1, h: 1 }, collider: { x: 1, y: 4, w: 14, h: 11 }, shadow: PROP_TEXTURES.shadowS },
+  animalBarn: {
+    texture: FT.animalBarn,
+    footprint: { w: 7, h: 3 },
+    collider: { x: 4, y: 8, w: 104, h: 38 },
+    offsetY: 1,
+    shadow: PROP_TEXTURES.shadowXL,
+    emissive: FT.animalBarnLit,
+    lights: [
+      { x: -36, y: -31, texture: 'light-window', scale: 0.7 },
+      { x: 36, y: -31, texture: 'light-window', scale: 0.7 },
+    ],
+    surface: 'wood',
+  },
+  nestBox: { texture: FT.nestBox, footprint: { w: 1, h: 1 }, collider: { x: 1, y: 6, w: 14, h: 9 }, shadow: PROP_TEXTURES.shadowS },
+  manger: { texture: FT.manger, footprint: { w: 2, h: 1 }, collider: { x: 1, y: 6, w: 30, h: 9 }, shadow: PROP_TEXTURES.shadowL },
   ropePost: { texture: X.ropePost, footprint: { w: 1, h: 1 }, collider: { x: 0, y: 9, w: 16, h: 6 } },
   ...Object.fromEntries(
     PAINTINGS.map((id, i) => [
