@@ -5,9 +5,10 @@ export const GAME_TITLE = 'Lembah Padi';
 
 export const RENDER = {
   /**
-   * The view shows this many tiles across. The native resolution is derived
-   * from the window: zoom = window / view. That is usually not a whole number,
-   * so some art pixels come out one screen pixel wider than their neighbours.
+   * At the default zoom step the view shows this many tiles across (phones
+   * never go below 1x). The native resolution is derived from the window:
+   * zoom = window / view, usually not a whole number, so some art pixels come
+   * out one screen pixel wider than their neighbours.
    */
   viewTilesWide: 35,
   /** Fallback native size, also used for generated full-screen textures. */
@@ -16,6 +17,18 @@ export const RENDER = {
   tileSize: 16,
   minZoom: 1,
   maxZoom: 8,
+} as const;
+
+/** Player zoom steps (+/-, pinch, Settings), as multiples of the default zoom. */
+export const ZOOM = {
+  factors: [0.75, 0.85, 1, 1.2, 1.4, 1.7, 2],
+  /** Index into factors used until the player picks one. */
+  defaultLevel: 2,
+  /** Pinch distance ratio that counts as one step. */
+  pinchStep: 1.25,
+  /** Never zoom in so far that the view is narrower than this (native px), so the HUD still fits. */
+  minViewWidth: 280,
+  storageKey: 'lembah-padi-zoom',
 } as const;
 
 export const PLAYER = {

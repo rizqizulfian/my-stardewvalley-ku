@@ -37,7 +37,7 @@ const touch = shouldShow();
 const HELP = {
   lines: [
     'WASD walk   Click/Space use tool, eat, reel   X/Right-click pick, talk, sit, read',
-    '1-0 or wheel: choose item   E backpack   M mute   Esc settings',
+    '1-0 or wheel: choose item   E backpack   M mute   +/- zoom   Esc settings',
     `hold ${DEBUG.fastForwardKey} fast time   ${DEBUG.nextDayKey} next day   H hide help`,
   ],
   /** The same reminder for the on-screen phone controls. */
@@ -45,6 +45,7 @@ const HELP = {
     'Stick walk   PAKAI use tool, eat, reel',
     'AKSI pick, talk, sit, read',
     'Tap item to choose   TAS backpack   MENU settings',
+    'Pinch with two fingers to zoom',
   ],
   showMs: 25000,
 } as const;
