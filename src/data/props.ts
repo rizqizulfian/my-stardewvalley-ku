@@ -329,12 +329,13 @@ export const PROPS: Record<string, PropDef> = {
   },
   warnSign: {
     texture: X.warnSign,
-    footprint: { w: 1, h: 1 },
-    collider: { x: 5, y: 10, w: 6, h: 5 },
+    footprint: { w: 3, h: 1 },
+    collider: { x: 26, y: 10, w: 5, h: 5 },
+    offsetX: 5,
     shadow: PROP_TEXTURES.shadowS,
     use: 'sign',
     text: [
-      'JANGAN MASUK!',
+      'DILARANG MASUK SINI!',
       'Underneath, in small shaky letters: "Seriously. Do NOT open this door. Nobody who went in came out the same."',
       'You lean closer. Faint music thumps somewhere behind the door...',
     ],

@@ -169,20 +169,21 @@ function dogHouse(): [PixelGrid, PixelGrid] {
   return [outline(g, { steps: 2 }), lit];
 }
 
-/** A crooked red "AWAS!" board on a post by the dog's door. It only makes people curious. */
+/** A crooked red "DILARANG MASUK SINI!" board on a post by the dog's door. It only makes people curious. */
 function warnSign(): PixelGrid {
-  const W = 26;
-  const H = 28;
+  const W = 58;
+  const H = 40;
   const g = new PixelGrid(W, H);
-  block(g, 12, 11, 3, 16, RAMPS.wood);
+  block(g, 27, 20, 3, 19, RAMPS.wood);
   const b = new PixelGrid(W, H);
-  block(b, 1, 3, 24, 10, ['wine', 'brick', 'coral'], { rim: 0.3, gradient: 0.4 });
-  b.stamp(textGrid('AWAS!', 'cream'), 2, 5);
-  b.set(3, 4, 'mist').set(22, 4, 'mist');
+  block(b, 1, 2, 54, 21, ['wine', 'brick', 'coral'], { rim: 0.3, gradient: 0.4 });
+  b.stamp(textGrid('DILARANG', 'cream'), 9, 5);
+  b.stamp(textGrid('MASUK SINI!', 'cream'), 4, 14);
+  b.set(3, 3, 'mist').set(52, 3, 'mist');
   // Hung crooked: the right side sags a little.
-  b.forEachFilled((x, y, c) => g.set(x, y + Math.floor(x / 9), c));
+  b.forEachFilled((x, y, c) => g.set(x, y + Math.floor(x / 15), c));
   // A crack across the lower corner.
-  g.line(19, 12, 23, 14, 'wine');
+  g.line(46, 24, 53, 26, 'wine');
   return outline(g, { steps: 2 });
 }
 
