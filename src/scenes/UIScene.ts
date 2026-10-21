@@ -18,6 +18,7 @@ import { InventoryMenu } from '../ui/InventoryMenu';
 import { addPanel } from '../ui/Panel';
 import { PixelText } from '../ui/PixelText';
 import { Notice, Toasts } from '../ui/Toasts';
+import type { IntroData } from './IntroScene';
 
 const PROMPT = {
   width: 150,
@@ -87,8 +88,13 @@ export class UIScene extends Phaser.Scene {
     this.shop = new ShopMenu(this, state);
     this.settings = new SettingsMenu(this, state);
     this.settings.onNewFarm = () => {
+      // Back to the opening story; the world waits until it ends.
+      this.started = false;
+      uiState.started = false;
       this.newFarm();
       this.syncModal();
+      this.help.setVisible(false);
+      this.playIntro();
     };
     this.dialog = new DialogBox(this);
     this.summary = new DaySummaryView(this);
@@ -231,6 +237,28 @@ export class UIScene extends Phaser.Scene {
     bus.emit(EV.inventoryChanged);
   }
 
+  /** The world starts running: HUD, controls reminder, the map's music. */
+  private startPlaying(): void {
+    this.started = true;
+    uiState.started = true;
+    bus.emit(EV.started);
+    this.syncModal();
+    this.help.setVisible(true).setAlpha(0.9);
+    this.time.delayedCall(HELP.showMs, () => this.tweens.add({ targets: this.help, alpha: 0, duration: 800, onComplete: () => this.help.setVisible(false) }));
+  }
+
+  /** The opening story, once per farm, then the game. */
+  private playIntro(): void {
+    const data: IntroData = {
+      onDone: () => {
+        state.introSeen = true;
+        this.startPlaying();
+      },
+    };
+    this.scene.launch('Intro', data);
+    this.scene.bringToTop('Intro');
+  }
+
   private centerPrompt(box: Phaser.GameObjects.Container): void {
     box.setPosition(Math.round((this.scale.width - PROMPT.width) / 2), Math.round((this.scale.height - PROMPT.height) / 2));
   }
@@ -255,16 +283,14 @@ export class UIScene extends Phaser.Scene {
     }
     const blink = this.time.addEvent({ delay: PROMPT.blinkMs, loop: true, callback: () => press.setVisible(!press.visible) });
 
+    let begun = false;
     const begin = () => {
-      if (this.started || this.dialog.isOpen) return;
-      this.started = true;
+      if (begun || this.dialog.isOpen) return;
+      begun = true;
       blink.remove();
       void audio.unlock().then(() => audio.playSfx('start', 0.8));
-      uiState.started = true;
-      bus.emit(EV.started);
-      this.syncModal();
-      this.help.setVisible(true);
-      this.time.delayedCall(HELP.showMs, () => this.tweens.add({ targets: this.help, alpha: 0, duration: 800, onComplete: () => this.help.setVisible(false) }));
+      if (state.introSeen) this.startPlaying();
+      else this.playIntro();
       this.tweens.add({
         targets: box,
         alpha: 0,

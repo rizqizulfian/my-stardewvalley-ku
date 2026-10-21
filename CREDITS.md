@@ -6,6 +6,10 @@
   File: `public/audio/apple-cider.ogg`. Added at the project owner's request; the owner supplied the file.
   Check Zane Little's current licence terms before publishing the game anywhere.
 
+* **Dancing dog song** in the little house in town. File: `public/audio/dog-dance.ogg`, cut from a short video
+  the project owner sent (it carried an Instagram watermark). The song's title, artist and licence are
+  unknown: fine for a personal project, but find the source or replace the track before publishing.
+
 All other music is generated live in code (`src/audio/GenerativeTrack.ts`, tracks in `src/data/music.ts`).
 
 ## Sound
@@ -15,7 +19,9 @@ Every sound effect and ambience layer (birds, crickets, wind, water, waves, gull
 
 ## Art
 
-All art is drawn by code at boot from the palette in `src/art/palette.ts`.
+All art is drawn by code at boot from the palette in `src/art/palette.ts`. The museum's paintings, sculptures
+and artists are made up for the game. The dancing dog is an original doodle inspired by a reference the
+project owner shared.
 
 ## Characters
 

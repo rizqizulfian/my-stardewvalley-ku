@@ -8,6 +8,7 @@ import { registerBuildings } from './buildings';
 import { registerExtras } from './extras';
 import { registerFarmArt } from './farm';
 import { registerFx } from './fx';
+import { registerIntroArt } from './intro';
 import { registerItemArt } from './items';
 import { registerNpcArt } from './npcs';
 import type { TextureSink } from './pixel';
@@ -26,4 +27,5 @@ export function registerAllArt(sink: TextureSink): void {
   registerNpcArt(sink);
   registerExtras(sink);
   registerFarmArt(sink);
+  registerIntroArt(sink);
 }

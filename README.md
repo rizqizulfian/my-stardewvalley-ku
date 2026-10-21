@@ -98,3 +98,17 @@ target map at `tx, ty`. Rooms smaller than the view are centred.
   from friends). A "!" shows over it when something is waiting.
 * **Settings** (`ui/SettingsMenu.ts`): Esc. Music, ambience and effect volumes, mute, save now, start a new
   farm, and the controls.
+
+## Valley extras (Phase 6)
+
+* **Opening story** (`scenes/IntroScene.ts`, text in `data/intro.ts`, pictures in `art/intro.ts`): a new
+  farm starts with five short scenes: Nek Lastri's porch, the city office at night, her letter, the bus
+  through the terraces and the arrival at the farm. Any key or click moves on, Esc skips. It plays once per farm.
+* **Farm animals** (`data/animals.ts`, `entities/Animal.ts`, `systems/AnimalSystem.ts`): hens, ducks, sheep and
+  cows in the pasture east of the field (long hay barn, windmill, trough, duck pond) and Oyen the cat by the
+  house. Pet them with X once a day. Cows give milk every day and sheep wool every three days when petted;
+  hens and ducks lay an egg in their run each morning.
+* **Beehives** by the flower beds north of the field: pick honey with X, more three days later.
+* **Town**: a tiny house with a dancing dog on the west side (with its own song), the art museum
+  (`data/maps/museum.ts`, open 9:00 to 18:00, read the plaques with X) and the park with its big fountain
+  through the east road. Nine more townsfolk (`data/npcs.ts`) make the streets, park and museum busier.
