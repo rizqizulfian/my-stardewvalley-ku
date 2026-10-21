@@ -87,7 +87,12 @@ export class IntroScene extends Phaser.Scene {
     this.box = addPanel(this, 0, 0, INTRO.w, LAYOUT.textH);
     this.body = new PixelText(this, 0, 0, '', { color: 'night', shadow: 'mist' });
     this.more = new PixelText(this, 0, 0, 'v', { color: 'clay', shadow: 'mist' });
-    this.skip = new PixelText(this, 0, 0, 'Esc  skip', { color: 'mauve', shadow: null });
+    this.skip = new PixelText(this, 0, 0, 'Esc  skip >>', { color: 'mauve', shadow: null });
+    // Tapping the label skips too, for phones without an Esc key.
+    this.skip.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      this.finish();
+    });
     this.layout();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this));

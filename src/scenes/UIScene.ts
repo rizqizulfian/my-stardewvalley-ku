@@ -19,6 +19,7 @@ import { addPanel } from '../ui/Panel';
 import { PixelText } from '../ui/PixelText';
 import { Notice, Toasts } from '../ui/Toasts';
 import type { IntroData } from './IntroScene';
+import type { TourData } from './TourScene';
 
 const PROMPT = {
   width: 150,
@@ -247,16 +248,22 @@ export class UIScene extends Phaser.Scene {
     this.time.delayedCall(HELP.showMs, () => this.tweens.add({ targets: this.help, alpha: 0, duration: 800, onComplete: () => this.help.setVisible(false) }));
   }
 
-  /** The opening story, once per farm, then the game. */
+  /** The opening story and the tour of the valley, once per farm, then the game. */
   private playIntro(): void {
     const data: IntroData = {
       onDone: () => {
         state.introSeen = true;
-        this.startPlaying();
+        this.playTour();
       },
     };
     this.scene.launch('Intro', data);
     this.scene.bringToTop('Intro');
+  }
+
+  private playTour(): void {
+    const data: TourData = { onDone: () => this.startPlaying() };
+    this.scene.launch('Tour', data);
+    this.scene.bringToTop('Tour');
   }
 
   private centerPrompt(box: Phaser.GameObjects.Container): void {
