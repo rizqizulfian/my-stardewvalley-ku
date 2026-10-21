@@ -61,6 +61,8 @@ export const ATMOSPHERE = {
   lightMaxAlpha: 0.85,
   /** Darkness level (0..1) above which windows and lamps switch on. */
   lightsOnThreshold: 0.25,
+  /** Indoors the day/night grade is this much weaker (0 = none, 1 = same as outside). */
+  indoorGrade: 0.35,
   leafSpawnEveryMs: 900,
   leafMaxAlive: 14,
   fireflyMaxAlive: 10,

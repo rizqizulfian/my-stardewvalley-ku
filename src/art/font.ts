@@ -1,3 +1,6 @@
+import { PixelGrid } from './pixel';
+import type { ColorName } from './palette';
+
 // Original proportional pixel font. Cap height 6px, one descender row.
 // Each glyph is a list of rows of '#' (ink) and '.' (empty).
 
@@ -129,4 +132,20 @@ export function wrapText(text: string, maxWidth: number): string[] {
     lines.push(line);
   }
   return lines;
+}
+
+/** Bake a line of text into a palette grid (used for painted signs). */
+export function textGrid(text: string, color: ColorName): PixelGrid {
+  const g = new PixelGrid(Math.max(1, measureText(text)), FONT.height);
+  let x = 0;
+  for (const ch of text) {
+    if (ch !== ' ') {
+      const rows = GLYPHS[ch] ?? GLYPHS['?'];
+      rows.forEach((row, ry) => {
+        for (let rx = 0; rx < row.length; rx++) if (row[rx] === '#') g.set(x + rx, ry, color);
+      });
+    }
+    x += glyphWidth(ch) + FONT.spacing;
+  }
+  return g;
 }

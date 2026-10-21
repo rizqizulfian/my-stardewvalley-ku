@@ -19,7 +19,30 @@ export const TERRAIN_TEXTURES = {
   water: 'tiles-water',
   deepWater: 'tiles-deep-water',
   cliff: 'tiles-cliff',
+  sand: 'tiles-sand',
+  paved: 'tiles-paved',
+  sea: 'tiles-sea',
+  interior: 'tiles-interior',
+  dock: 'tiles-dock',
 } as const;
+
+/** Interior tileset frames (per cell). */
+export const INTERIOR_TILE = {
+  floor: 0,
+  floorVariants: 3,
+  floorShadowTop: 3,
+  floorShadowLeft: 4,
+  floorShadowRight: 5,
+  wallUpper: 6,
+  wallLower: 7,
+  wallTop: 8,
+  void: 9,
+  /** Same wall frames in a second colourway, for shops. */
+  altOffset: 10,
+} as const;
+
+/** Dock tile index = sum of the open sides: left edge 1, right edge 2, front end 4. */
+export const DOCK_TILE = { left: 1, right: 2, end: 4, count: 8 } as const;
 
 export const GRASS_VARIANTS = 6;
 export const WATER_FRAMES = 4;
@@ -329,6 +352,184 @@ function shadowBelowTile(): PixelGrid {
 }
 
 // ---------------------------------------------------------------------------
+// Beach sand, town paving and the sea (dual grid)
+
+function speckle(g: PixelGrid, seed: number, n: number, on: ColorName, colors: ColorName[]): void {
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(hash2(seed, i, 61) * T);
+    const y = Math.floor(hash2(seed, i, 62) * T);
+    if (g.colorAt(x, y) === on) g.set(x, y, colors[i % colors.length]);
+  }
+}
+
+function sandTile(mask: number, variant = 0): PixelGrid {
+  const g = dualTile(mask, 53, 0.3, (_x, _y, F) => {
+    const f = F(0, 0);
+    if (f >= 0.5) {
+      // A soft lip where grass gives way to sand.
+      if (F(0, -1) < 0.5 || F(-1, 0) < 0.5) return 'tan';
+      return 'sand';
+    }
+    if (f >= 0.44) return 'leaf';
+    return null;
+  });
+  // Wind ripples and grains.
+  for (let i = 0; i < 2; i++) {
+    const x = 2 + Math.floor(hash2(mask + variant * 17, i, 63) * 9);
+    const y = 3 + Math.floor(hash2(mask + variant * 17, i, 64) * 10);
+    for (let k = 0; k < 4; k++) if (g.colorAt(x + k, y + (k === 0 || k === 3 ? 0 : -1)) === 'sand') g.set(x + k, y + (k === 0 || k === 3 ? 0 : -1), 'tan');
+  }
+  speckle(g, mask * 3 + variant * 29, 7, 'sand', ['cream', 'tan', 'cream']);
+  return g;
+}
+
+function pavedTile(mask: number): PixelGrid {
+  return dualTile(mask, 71, 0.1, (x, y, F) => {
+    const f = F(0, 0);
+    if (f >= 0.5) {
+      // Kerb: dark where paving meets grass below or to the right, light on the far side.
+      if (F(0, 1) < 0.5 || F(1, 0) < 0.5) return 'plum';
+      if (F(0, -1) < 0.5 || F(-1, 0) < 0.5) return 'haze';
+      // Pavers in a running bond, 8x8 with a 1px joint.
+      const row = Math.floor(y / 8);
+      const px = (x + (row % 2) * 4) % 8;
+      const py = y % 8;
+      if (px === 0 || py === 0) return 'mauve';
+      if (px === 7 || py === 7) return 'haze';
+      if (px === 1 && py === 1) return 'cream';
+      // A few warmer stones for variety.
+      const stone = hash2(Math.floor((x + (row % 2) * 4) / 8) + mask * 3, row, 73);
+      return stone < 0.18 ? 'sand' : 'mist';
+    }
+    if (f >= 0.45) return 'leaf';
+    return null;
+  });
+}
+
+function seaTile(mask: number, frame: number, variant = 0): PixelGrid {
+  const phase = (frame / WATER_FRAMES) * Math.PI * 2;
+  // The shore line breathes in and out with the waves.
+  const lap = 0.06 + 0.05 * Math.sin(phase);
+  const seed = mask * 7 + variant * 101;
+  const g = dualTile(mask, 31, 0.3, (_x, _y, F) => {
+    const f = F(0, 0);
+    if (f >= 0.5 + lap) {
+      if (f < 0.58 + lap) return 'foam';
+      if (f < 0.64 + lap) return 'cream';
+      return 'sky';
+    }
+    if (f >= 0.5) return 'foam';
+    // Wet sand darkens toward the water.
+    if (f >= 0.4) return 'tan';
+    return null;
+  });
+  for (let i = 0; i < 2; i++) {
+    if (hash2(i, seed, 50) < 0.35) continue;
+    const bx = Math.floor(hash2(i, seed, 51) * 9);
+    const y = 4 + Math.floor(hash2(i, seed, 52) * 9);
+    const life = (frame + i * 2 + variant) % WATER_FRAMES;
+    const x = 2 + ((bx + frame) % 9);
+    const len = life === 0 ? 0 : life === 2 ? 3 : 2;
+    for (let k = 0; k < len; k++) if (g.colorAt(x + k, y) === 'sky') g.set(x + k, y, k === 1 && life === 2 ? 'cream' : 'foam');
+  }
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// Interiors (per cell)
+
+function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right'): PixelGrid {
+  // Warm wooden boards, 4px wide, running left to right with staggered ends.
+  const g = new PixelGrid(T, T);
+  for (let y = 0; y < T; y++) {
+    const board = Math.floor(y / 4);
+    const off = (board * 5 + variant * 7) % T;
+    for (let x = 0; x < T; x++) {
+      let c: ColorName = y % 4 === 3 ? 'umber' : y % 4 === 0 ? 'tan' : 'clay';
+      if ((x + off) % T === 0) c = 'umber';
+      else if (y % 4 === 1 && hash2(x + variant * 31, board, 83) < 0.08) c = 'tan';
+      g.set(x, y, c);
+    }
+  }
+  if (shadow === 'top') for (let x = 0; x < T; x++) g.set(x, 0, 'bark').set(x, 1, 'umber').set(x, 2, ditherPick(x, 2, 0.5) ? 'umber' : g.colorAt(x, 2)!);
+  if (shadow === 'left') for (let y = 0; y < T; y++) g.set(0, y, 'bark').set(1, y, 'umber');
+  if (shadow === 'right') for (let y = 0; y < T; y++) g.set(T - 1, y, 'bark').set(T - 2, y, 'umber');
+  return g;
+}
+
+function wallTiles(paper: [ColorName, ColorName, ColorName], wains: [ColorName, ColorName, ColorName]): PixelGrid[] {
+  const [pDark, pBase, pLight] = paper;
+  const upper = new PixelGrid(T, T).fillRect(0, 0, T, T, pBase);
+  // Wallpaper: small diamond motif.
+  for (let y = 2; y < T; y += 8)
+    for (let x = 3; x < T; x += 8) {
+      upper.set(x, y, pLight).set(x - 1, y + 1, pLight).set(x + 1, y + 1, pLight).set(x, y + 2, pLight);
+      upper.set(x + 4, y + 5, pDark);
+    }
+  const lower = upper.clone();
+  // Wainscot panelling and skirting board on the lower half.
+  const [wDark, wBase, wLight] = wains;
+  lower.fillRect(0, 6, T, 1, wLight).fillRect(0, 7, T, 7, wBase).fillRect(0, 14, T, 2, wDark);
+  for (let x = 3; x < T; x += 8) lower.fillRect(x, 9, 1, 4, wDark).fillRect(x + 1, 9, 1, 4, wLight);
+  lower.fillRect(0, 13, T, 1, wDark);
+  const top = upper.clone();
+  top.fillRect(0, 0, T, 3, 'bark').fillRect(0, 3, T, 1, 'umber').fillRect(0, 4, T, 1, pDark);
+  return [upper, lower, top];
+}
+
+function interiorTiles(): PixelGrid[] {
+  const v = new PixelGrid(T, T).fillRect(0, 0, T, T, 'ink');
+  const out = [
+    floorTile(0, 'none'),
+    floorTile(1, 'none'),
+    floorTile(2, 'none'),
+    floorTile(0, 'top'),
+    floorTile(1, 'left'),
+    floorTile(2, 'right'),
+    ...wallTiles(['tan', 'sand', 'cream'], ['bark', 'umber', 'clay']),
+    v,
+  ];
+  // Second colourway (shops): cool plaster with dark wood.
+  return [...out, ...out.slice(0, 6), ...wallTiles(['haze', 'mist', 'cream'], ['bark', 'clay', 'tan']), v];
+}
+
+function dockTiles(): PixelGrid[] {
+  // Boards run across the walkway, 4px each, with staggered seams.
+  const base = new PixelGrid(T, T);
+  for (let y = 0; y < T; y++)
+    for (let x = 0; x < T; x++) {
+      const row = y % 4;
+      const board = Math.floor(y / 4);
+      let c: ColorName = row === 0 ? 'sand' : row === 3 ? 'umber' : 'tan';
+      if (row === 2 && (x * 7 + board * 5) % 11 === 0) c = 'clay';
+      if (x === (board * 9 + 5) % T && row !== 3) c = 'umber';
+      base.set(x, y, c);
+    }
+  const tiles: PixelGrid[] = [];
+  for (let i = 0; i < DOCK_TILE.count; i++) {
+    const g = base.clone();
+    const end = i & DOCK_TILE.end;
+    const h = end ? 12 : T;
+    // Side beam with nails where the dock meets the water.
+    if (i & DOCK_TILE.left) {
+      g.fillRect(0, 0, 2, h, 'clay').fillRect(0, 0, 1, h, 'bark');
+      for (let y = 1; y < h; y += 4) g.set(1, y, 'umber');
+    }
+    if (i & DOCK_TILE.right) {
+      g.fillRect(T - 2, 0, 2, h, 'clay').fillRect(T - 1, 0, 1, h, 'bark');
+      for (let y = 1; y < h; y += 4) g.set(T - 2, y, 'umber');
+    }
+    if (end) {
+      // Front edge and posts dropping into the water.
+      g.fillRect(0, 12, T, 1, 'umber').fillRect(0, 13, T, 3, 'bark');
+      g.fillRect(1, 13, 3, 3, 'clay').fillRect(12, 13, 3, 3, 'clay').fillRect(1, 13, 1, 3, 'tan').fillRect(12, 13, 1, 3, 'tan');
+    }
+    tiles.push(g);
+  }
+  return tiles;
+}
+
+// ---------------------------------------------------------------------------
 
 export function registerTerrain(sink: TextureSink): void {
   sink.sheet(
@@ -377,4 +578,24 @@ export function registerTerrain(sink: TextureSink): void {
     T,
     T,
   );
+  sink.sheet(
+    TERRAIN_TEXTURES.sand,
+    Array.from({ length: MEADOW_TILES }, (_, i) => (i < DUAL_TILE_COUNT ? sandTile(i) : sandTile(15, i))),
+    T,
+    T,
+  );
+  sink.sheet(
+    TERRAIN_TEXTURES.paved,
+    Array.from({ length: DUAL_TILE_COUNT }, (_, m) => pavedTile(m)),
+    T,
+    T,
+  );
+  const sea: PixelGrid[] = [];
+  for (let f = 0; f < WATER_FRAMES; f++) {
+    for (let m = 0; m < DUAL_TILE_COUNT; m++) sea.push(seaTile(m, f));
+    for (let v = 0; v < FULL_VARIANTS; v++) sea.push(seaTile(15, f, v + 1));
+  }
+  sink.sheet(TERRAIN_TEXTURES.sea, sea, T, T, WATER_TILES_PER_FRAME);
+  sink.sheet(TERRAIN_TEXTURES.interior, interiorTiles(), T, T);
+  sink.sheet(TERRAIN_TEXTURES.dock, dockTiles(), T, T);
 }

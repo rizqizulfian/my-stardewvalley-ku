@@ -11,8 +11,11 @@ npm run build    # static site in dist/
 
 The view shows about 30 tiles across; the native resolution follows the window at a whole-number zoom.
 
-Controls: WASD / arrows to walk, M to mute, hold T to fast-forward the clock (debug).
-Press any key on the start screen to begin (this also starts audio).
+Controls: WASD / arrows to walk, click / Space to use the held tool, X / right-click to pick or talk,
+1-0 or the wheel to choose an item, E for the backpack, M to mute, hold T to fast-forward the clock and
+N to skip to the next day (debug). Press any key on the start screen to begin (this also starts audio).
+
+Music credits are in [CREDITS.md](CREDITS.md).
 
 ## Layout
 
@@ -43,8 +46,9 @@ Press any key on the start screen to begin (this also starts audio).
 
 * `AudioManager.playMusic(id)` crossfades (2.5 s) to a track from `data/music.ts`. Tracks are generative
   (chord progression, motif-based melody, pad, keys, sub bass, soft drums, vinyl crackle) or `kind: 'file'`.
-* Ambience layers (birds, crickets, wind, water) follow curves in `data/ambience.ts`, scaled per map.
-  Water volume follows the player's distance to the pond.
+* Ambience layers (birds, crickets, wind, water, waves, gulls) follow curves in `data/ambience.ts`, scaled
+  per map. Water and surf volume follow the player's distance to water.
+* File tracks are decoded once and resume where they stopped when the player comes back to that map.
 * SFX are synthesised with random pitch variation; footsteps change with the surface underfoot.
 * Volumes and mute persist in localStorage.
 
@@ -53,3 +57,7 @@ Press any key on the start screen to begin (this also starts audio).
 Maps are ASCII rows in `src/data/maps/*.ts`: a terrain layer and a prop layer of the same size.
 Legends live in `data/terrain.ts` and `data/props.ts`. A prop character marks the bottom-left cell of its
 footprint; `#` in the prop layer marks cells covered by a bigger prop.
+
+Maps: Farm, Rumah (house interior), Kampung Padi (village), Pasar Lembah (town), Pantai Senja (beach).
+`warps` in a map def are exit rectangles: walking into one fades out and restarts the World scene on the
+target map at `tx, ty`. Rooms smaller than the view are centred.

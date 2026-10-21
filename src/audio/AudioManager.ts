@@ -5,7 +5,7 @@
 
 import { AUDIO } from '../config';
 import { AMBIENCE_CURVES, sampleCurve, type AmbienceLayerId } from '../data/ambience';
-import { TRACKS_BY_ID, type FileTrackDef, type TrackDef } from '../data/music';
+import { TRACKS, TRACKS_BY_ID, type FileTrackDef, type TrackDef } from '../data/music';
 import type { Surface } from '../data/terrain';
 import { createAmbienceLayers, type AmbienceLayer } from './Ambience';
 import { GenerativeTrack, type MusicSource } from './GenerativeTrack';
@@ -22,9 +22,30 @@ export interface AudioSettings {
 }
 
 /** Looping file-based track, so recorded music can replace generative tracks. */
+/** Decoded files, shared by every play of the same url. */
+const decoded = new Map<string, Promise<AudioBuffer>>();
+/** Where each file was when it last faded out, so coming back resumes the song. */
+const resumeAt = new Map<string, number>();
+/** A file that arrives after its crossfade began fades in over this long (s). */
+const LATE_FADE_SECONDS = 1.5;
+
+function loadFile(ctx: BaseAudioContext, url: string): Promise<AudioBuffer> {
+  let p = decoded.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => ctx.decodeAudioData(b));
+    decoded.set(url, p);
+    p.catch(() => decoded.delete(url));
+  }
+  return p;
+}
+
 class FileTrack implements MusicSource {
   readonly output: GainNode;
   private src?: AudioBufferSourceNode;
+  private startedAt = 0;
+  private offset = 0;
   private _stopped = false;
 
   constructor(
@@ -42,18 +63,21 @@ class FileTrack implements MusicSource {
   }
 
   start(at: number): void {
-    fetch(this.def.url)
-      .then((r) => r.arrayBuffer())
-      .then((b) => this.ctx.decodeAudioData(b))
+    loadFile(this.ctx, this.def.url)
       .then((buf) => {
         if (this._stopped) return;
         const s = this.ctx.createBufferSource();
         s.buffer = buf;
         s.loop = true;
         const g = this.ctx.createGain();
-        g.gain.value = this.def.gain;
+        const when = Math.max(at, this.ctx.currentTime);
+        const late = when - at > 0.25;
+        g.gain.setValueAtTime(late ? 0.0001 : this.def.gain, when);
+        if (late) g.gain.linearRampToValueAtTime(this.def.gain, when + LATE_FADE_SECONDS);
         s.connect(g).connect(this.output);
-        s.start(Math.max(at, this.ctx.currentTime));
+        this.offset = (resumeAt.get(this.def.url) ?? 0) % buf.duration;
+        this.startedAt = when;
+        s.start(when, this.offset);
         this.src = s;
       })
       .catch((e) => console.warn('[audio] could not load', this.def.url, e));
@@ -62,6 +86,10 @@ class FileTrack implements MusicSource {
   scheduleUntil(): void {}
 
   stop(at: number): void {
+    if (this.src?.buffer) {
+      const played = Math.max(0, at - this.startedAt);
+      resumeAt.set(this.def.url, (this.offset + played) % this.src.buffer.duration);
+    }
     this.src?.stop(at);
     this._stopped = true;
   }
@@ -138,6 +166,8 @@ export class AudioManager {
     wet.connect(this.buses.music);
 
     this.ambience = createAmbienceLayers(ctx, this.buses.ambience, this.reverbIn);
+    // Decode recorded tracks early so the first crossfade into them is not late.
+    for (const t of TRACKS) if (t.kind === 'file') void loadFile(ctx, t.url).catch(() => undefined);
 
     this.timer = window.setInterval(() => this.tick(), AUDIO.schedulerIntervalMs);
     document.addEventListener('visibilitychange', () => {

@@ -83,7 +83,7 @@ export const FARM_MAP: MapDef = {
   decor: { flowers: 0.07, tufts: 0.12, pebbles: 0.02, meadow: 0.36, reeds: 0.45, lilies: 0.18 },
   music: {
     morning: 'farm-morning',
-    day: 'farm-day',
+    day: 'apple-cider',
     evening: 'farm-evening',
     night: 'farm-night',
   },
@@ -91,4 +91,8 @@ export const FARM_MAP: MapDef = {
   backdrop: 'pine',
   leaves: true,
   tillable: true,
+  warps: [
+    { x: 47, y: 13, h: 3, to: 'village', tx: 1, ty: 14, face: 'right' },
+    { x: 6, y: 11, to: 'house', tx: 6, ty: 10, face: 'up', door: true },
+  ],
 };

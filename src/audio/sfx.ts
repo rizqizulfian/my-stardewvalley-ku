@@ -177,4 +177,13 @@ export const SFX: Record<string, SfxFn> = {
   pickup: (ctx, d, t, p) => {
     thump(ctx, d, t, 880 * p, 1320 * p, 0.07, 0.05);
   },
+  door: (ctx, d, t, p) => {
+    // Latch, a short wooden creak, then the door settling.
+    burst(ctx, d, t, { type: 'bandpass', freq: 2400 * p, q: 3, dur: 0.03, gain: 0.05 });
+    burst(ctx, d, t + 0.04, { type: 'bandpass', freq: 700 * p, q: 6, dur: 0.22, gain: 0.05, attack: 0.05, sweepTo: 520 * p });
+    thump(ctx, d, t + 0.2, 140 * p, 90 * p, 0.1, 0.1, 'triangle');
+  },
+  whoosh: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'bandpass', freq: 500 * p, q: 0.7, dur: 0.3, gain: 0.06, attack: 0.12, sweepTo: 1200 * p });
+  },
 };

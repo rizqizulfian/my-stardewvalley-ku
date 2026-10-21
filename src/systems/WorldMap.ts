@@ -4,7 +4,7 @@
 import { RENDER } from '../config';
 import type { MapDef } from '../data/maps/types';
 import { PROPS, PROP_LEGEND, type Box, type PropDef } from '../data/props';
-import { TERRAIN, TERRAIN_LEGEND, type Surface, type TerrainDef, type TerrainKind } from '../data/terrain';
+import { TERRAIN, TERRAIN_LEGEND, isWaterTerrain, type Surface, type TerrainDef, type TerrainKind } from '../data/terrain';
 
 const T = RENDER.tileSize;
 
@@ -200,7 +200,7 @@ export class WorldMap {
     let best = cap;
     for (let y = cy - cap; y <= cy + cap; y++)
       for (let x = cx - cap; x <= cx + cap; x++) {
-        if (!this.inBounds(x, y) || !TERRAIN[this.kindAt(x, y)].water) continue;
+        if (!this.inBounds(x, y) || !isWaterTerrain(TERRAIN[this.kindAt(x, y)])) continue;
         best = Math.min(best, Math.hypot(x - cx, y - cy));
       }
     return best;

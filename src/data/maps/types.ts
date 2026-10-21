@@ -37,4 +37,23 @@ export interface MapDef {
   leaves: boolean;
   /** Open grass here can be tilled for crops. */
   tillable?: boolean;
+  /** Indoor maps: steady lighting, no sky effects. 'shop' picks the second wall colourway. */
+  indoor?: boolean;
+  interiorStyle?: 'home' | 'shop';
+  /** Exits: stepping into the rectangle (cells) moves the player to another map. */
+  warps?: WarpDef[];
+}
+
+export interface WarpDef {
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  to: string;
+  /** Arrival cell and facing on the target map. */
+  tx: number;
+  ty: number;
+  face?: 'down' | 'up' | 'left' | 'right';
+  /** Door sound instead of a plain fade. */
+  door?: boolean;
 }

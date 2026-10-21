@@ -13,6 +13,7 @@ import {
   shade,
   type TextureSink,
 } from './pixel';
+import { textGrid } from './font';
 import { RAMPS, darker, type ColorName, type Ramp } from './palette';
 
 export const PROP_TEXTURES = {
@@ -361,7 +362,21 @@ function mailbox(): PixelGrid {
  * Player house: a hip roof of clay tiles over a timber house on a stone
  * footing. Returns [day sprite, emissive night overlay].
  */
-function house(): [PixelGrid, PixelGrid] {
+export interface HouseStyle {
+  /** Roof tiles, dark to light (like RAMPS.roof). */
+  roof: readonly [ColorName, ColorName, ColorName, ColorName];
+  walls: 'wood' | 'plaster';
+  /** Painted sign board over the door. */
+  sign?: string;
+  /** Striped cloth awning over the front: [stripe, base]. */
+  awning?: [ColorName, ColorName];
+  seed?: number;
+}
+
+const DEFAULT_HOUSE: HouseStyle = { roof: ['wine', 'brick', 'coral', 'peach'], walls: 'wood' };
+
+export function house(o: HouseStyle = DEFAULT_HOUSE): [PixelGrid, PixelGrid] {
+  const [rDark, rMid, rLight, rHi] = o.roof;
   const W = 80;
   const H = 74;
   const g = new PixelGrid(W, H);
@@ -371,9 +386,15 @@ function house(): [PixelGrid, PixelGrid] {
 
   // Walls: vertical planks.
   const wall = new PixelGrid(W, H).fillRect(6, wallTop, W - 12, footTop - wallTop, 'ink');
-  g.stamp(shade(wall, RAMPS.lightWood, { rim: 0.15, gradient: 0.45, bias: -0.05, dither: 0.5 }));
-  for (let x = 6; x < W - 6; x += 5) for (let y = wallTop; y < footTop; y++) g.set(x, y, 'umber');
-  for (let x = 6; x < W - 6; x++) if (hash2(x, 1, 4) < 0.5) g.set(x, wallTop + 12 + (x % 3), 'clay');
+  if (o.walls === 'wood') {
+    g.stamp(shade(wall, RAMPS.lightWood, { rim: 0.15, gradient: 0.45, bias: -0.05, dither: 0.5 }));
+    for (let x = 6; x < W - 6; x += 5) for (let y = wallTop; y < footTop; y++) g.set(x, y, 'umber');
+    for (let x = 6; x < W - 6; x++) if (hash2(x, 1, 4) < 0.5) g.set(x, wallTop + 12 + (x % 3), 'clay');
+  } else {
+    // Lime plaster over a wooden frame: a beam along the top and a dado line.
+    g.stamp(shade(wall, RAMPS.plaster, { rim: 0.1, gradient: 0.35, bias: 0.15, dither: 0.6, noise: 0.15, seed: o.seed ?? 3 }));
+    for (let x = 6; x < W - 6; x++) g.set(x, wallTop + 2, 'clay').set(x, footTop - 6, 'haze');
+  }
   // Corner posts.
   g.stamp(shade(new PixelGrid(W, H).fillRect(5, wallTop, 3, footTop - wallTop, 'ink'), RAMPS.wood, { rim: 0.4 }));
   g.stamp(shade(new PixelGrid(W, H).fillRect(W - 8, wallTop, 3, footTop - wallTop, 'ink'), RAMPS.wood, { rim: 0.4, bias: -0.2 }));
@@ -420,8 +441,8 @@ function house(): [PixelGrid, PixelGrid] {
       }
     lit.fillRect(wnd.x + wnd.w / 2, wnd.y, 1, wnd.h, 'clay').fillRect(wnd.x, wnd.y + wnd.h / 2, wnd.w, 1, 'clay');
     // Shutters.
-    g.stamp(shade(new PixelGrid(W, H).fillRect(wnd.x - 4, wnd.y - 1, 3, wnd.h + 2, 'ink'), RAMPS.roof.slice(0, 3), { rim: 0.3 }));
-    g.stamp(shade(new PixelGrid(W, H).fillRect(wnd.x + wnd.w + 1, wnd.y - 1, 3, wnd.h + 2, 'ink'), RAMPS.roof.slice(0, 3), { rim: 0.3, bias: -0.2 }));
+    g.stamp(shade(new PixelGrid(W, H).fillRect(wnd.x - 4, wnd.y - 1, 3, wnd.h + 2, 'ink'), [rDark, rMid, rLight], { rim: 0.3 }));
+    g.stamp(shade(new PixelGrid(W, H).fillRect(wnd.x + wnd.w + 1, wnd.y - 1, 3, wnd.h + 2, 'ink'), [rDark, rMid, rLight], { rim: 0.3, bias: -0.2 }));
     // Flower box.
     const by = wnd.y + wnd.h + 1;
     g.stamp(shade(new PixelGrid(W, H).fillRect(wnd.x - 1, by, wnd.w + 2, 3, 'ink'), RAMPS.wood, { rim: 0.3 }));
@@ -452,16 +473,16 @@ function house(): [PixelGrid, PixelGrid] {
     for (let x = Math.max(0, hl); x <= Math.min(W - 1, hr); x++) {
       const row = (y - ridgeY) % 4;
       let c: ColorName;
-      if (x < fl) c = row === 3 ? 'brick' : row === 0 ? 'peach' : 'coral'; // lit left hip
-      else if (x > fr) c = row === 3 ? 'wine' : row === 0 ? 'brick' : 'wine'; // shaded right hip
-      else c = row === 3 ? 'wine' : row === 0 ? 'coral' : 'brick'; // front face
+      if (x < fl) c = row === 3 ? rMid : row === 0 ? rHi : rLight; // lit left hip
+      else if (x > fr) c = row === 3 ? rDark : row === 0 ? rMid : rDark; // shaded right hip
+      else c = row === 3 ? rDark : row === 0 ? rLight : rMid; // front face
       // Staggered tile seams.
       const seam = (Math.floor((y - ridgeY) / 4) % 2) * 3;
-      if (row !== 3 && (x + seam) % 6 === 0 && x >= fl && x <= fr) c = 'wine';
+      if (row !== 3 && (x + seam) % 6 === 0 && x >= fl && x <= fr) c = rDark;
       g.set(x, y, c);
     }
     // Hip lines.
-    g.set(fl, y, 'peach').set(fr, y, 'wine');
+    g.set(fl, y, rHi).set(fr, y, rDark);
   }
   // Ridge cap with carved end ornaments.
   for (let x = ridgeL - 6; x <= ridgeR + 6; x++) g.set(x, ridgeY - 1, 'gold').set(x, ridgeY, 'amber').set(x, ridgeY + 1, 'clay');
@@ -469,14 +490,36 @@ function house(): [PixelGrid, PixelGrid] {
     g.fillRect(ox, ridgeY - 4, 2, 4, 'amber').set(ox, ridgeY - 4, 'gold').set(ox + (ox < W / 2 ? -1 : 2), ridgeY - 5, 'gold');
   }
   // Eave fascia.
-  for (let x = 0; x < W; x++) g.set(x, eave + 1, 'umber').set(x, eave, x < 3 ? 'coral' : 'brick');
+  for (let x = 0; x < W; x++) g.set(x, eave + 1, 'umber').set(x, eave, x < 3 ? rLight : rMid);
   // Weathering speckles.
   const r = rng(4242);
   for (let i = 0; i < 40; i++) {
     const x = Math.floor(r() * W);
     const y = ridgeY + 2 + Math.floor(r() * (eave - ridgeY - 2));
-    if (g.colorAt(x, y) === 'brick') g.set(x, y, 'coral');
-    else if (g.colorAt(x, y) === 'coral') g.set(x, y, 'peach');
+    if (g.colorAt(x, y) === rMid) g.set(x, y, rLight);
+    else if (g.colorAt(x, y) === rLight) g.set(x, y, rHi);
+  }
+  if (o.awning) {
+    // Scalloped stripes over the door and windows.
+    const [stripe, base] = o.awning;
+    const ay = wallTop + 1;
+    for (let x = 8; x < W - 8; x++) {
+      const c = Math.floor((x - 8) / 4) % 2 === 0 ? stripe : base;
+      for (let y = ay; y < ay + 5; y++) g.set(x, y, c);
+      if ((x - 8) % 4 !== 3) g.set(x, ay + 5, c);
+      g.set(x, ay, darker(c));
+    }
+  }
+  if (o.sign) {
+    // Painted board on the roof face above the door.
+    const tg = textGrid(o.sign, 'cream');
+    const bw = tg.w + 8;
+    const bx = Math.round((W - bw) / 2);
+    const by = eave - 13;
+    g.stamp(shade(new PixelGrid(W, H).fillRect(bx, by, bw, 11, 'ink'), RAMPS.wood, { rim: 0.3, gradient: 0.4 }));
+    g.fillRect(bx + 1, by + 1, bw - 2, 9, 'umber');
+    g.stampClipped(tg, bx + 4, by + 2);
+    g.line(bx + 3, by + 11, bx + 3, eave, 'bark').line(bx + bw - 4, by + 11, bx + bw - 4, eave, 'bark');
   }
   return [outline(g, { steps: 2 }), lit];
 }

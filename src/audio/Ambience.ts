@@ -159,11 +159,105 @@ class NoiseBed extends BaseLayer {
   }
 }
 
+/** Sea: a low surf bed plus waves that roll in, break and wash back out. */
+class Waves extends BaseLayer {
+  private next = 0;
+
+  constructor(id: AmbienceLayerId, ctx: BaseAudioContext, dest: AudioNode, reverb?: AudioNode) {
+    super(id, ctx, dest, reverb);
+    const bed = noiseSource(ctx, ctx.currentTime, 0, true);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 260;
+    const g = ctx.createGain();
+    g.gain.value = 0.05;
+    bed.connect(lp).connect(g).connect(this.gain);
+  }
+
+  schedule(now: number, horizon: number): void {
+    if (this.next < now) this.next = now + 0.3;
+    while (this.next < horizon) {
+      if (this.level > 0.02) this.wave(this.next);
+      this.next += 5.5 + Math.random() * 3.5;
+    }
+  }
+
+  private wave(t: number): void {
+    const ctx = this.ctx;
+    const rise = 1.8 + Math.random() * 0.8;
+    const wash = 3.2 + Math.random() * 1.5;
+    const peak = 0.07 + Math.random() * 0.04;
+    const n = noiseSource(ctx, t, rise + wash + 0.2);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 0.4;
+    lp.frequency.setValueAtTime(320, t);
+    lp.frequency.exponentialRampToValueAtTime(1500 + Math.random() * 500, t + rise);
+    lp.frequency.exponentialRampToValueAtTime(420, t + rise + wash);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + rise);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rise + wash);
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = Math.random() * 0.8 - 0.4;
+    n.connect(lp).connect(g).connect(pan).connect(this.gain);
+  }
+}
+
+/** Distant gulls: a few gliding cries, then quiet for a while. */
+class Gulls extends BaseLayer {
+  private next = 0;
+
+  schedule(now: number, horizon: number): void {
+    if (this.next < now) this.next = now + 2 + Math.random() * 4;
+    while (this.next < horizon) {
+      if (this.level > 0.05) this.call(this.next);
+      this.next += 6 + Math.random() * (14 - this.level * 6);
+    }
+  }
+
+  private call(t: number): void {
+    const ctx = this.ctx;
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = Math.random() * 1.4 - 0.7;
+    pan.connect(this.gain);
+    if (this.reverb) {
+      const s = ctx.createGain();
+      s.gain.value = 0.7;
+      pan.connect(s).connect(this.reverb);
+    }
+    const f0 = 1150 + Math.random() * 250;
+    const cries = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < cries; i++) {
+      const st = t + i * (0.24 + Math.random() * 0.08);
+      const len = i === cries - 1 ? 0.3 : 0.17;
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(f0 * 0.82, st);
+      o.frequency.linearRampToValueAtTime(f0 * 1.3, st + len * 0.3);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.75, st + len);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f0 * 1.4;
+      bp.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.linearRampToValueAtTime(0.035, st + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + len);
+      o.connect(bp).connect(g).connect(pan);
+      o.start(st);
+      o.stop(st + len + 0.02);
+    }
+  }
+}
+
 export function createAmbienceLayers(ctx: BaseAudioContext, dest: AudioNode, reverb?: AudioNode): AmbienceLayer[] {
   return [
     new Birds('birds', ctx, dest, reverb),
     new Crickets('crickets', ctx, dest, reverb),
     new NoiseBed('wind', ctx, dest, { freq: 480, q: 0.6, gain: 0.09, drift: 0.8, swell: 0.7, period: 4 }),
     new NoiseBed('water', ctx, dest, { freq: 900, q: 0.9, gain: 0.05, drift: 0.5, swell: 0.6, period: 1.6 }),
+    new Waves('waves', ctx, dest, reverb),
+    new Gulls('gulls', ctx, dest, reverb),
   ];
 }

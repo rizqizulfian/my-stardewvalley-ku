@@ -4,6 +4,7 @@
 import { PLAYER } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { CHAR_FRAMES, buildCharacterFrames } from './characters';
+import { registerBuildings } from './buildings';
 import { registerFx } from './fx';
 import { registerItemArt } from './items';
 import type { TextureSink } from './pixel';
@@ -13,6 +14,7 @@ import { registerTerrain } from './terrain';
 export function registerAllArt(sink: TextureSink): void {
   registerTerrain(sink);
   registerProps(sink);
+  registerBuildings(sink);
   registerFx(sink);
   registerItemArt(sink);
   for (const c of CHARACTERS) {

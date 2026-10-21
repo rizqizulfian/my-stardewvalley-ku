@@ -48,6 +48,8 @@ export class Atmosphere {
     private readonly scene: Phaser.Scene,
     private readonly rendered: RenderedMap,
     private readonly leavesEnabled: boolean,
+    /** Rooms keep a soft, warm grade and no fireflies; lamps still follow the clock. */
+    private readonly indoor = false,
   ) {
     const pad = 4;
     this.grade = scene.add
@@ -85,16 +87,17 @@ export class Atmosphere {
   update(timeMs: number, deltaMs: number, minute: number): void {
     // Grade.
     const { a, b, t } = sampleGrade(minute);
-    const ca = gradeRgb(a.color, a.strength);
-    const cb = gradeRgb(b.color, b.strength);
+    const k = this.indoor ? ATMOSPHERE.indoorGrade : 1;
+    const ca = gradeRgb(a.color, a.strength * k);
+    const cb = gradeRgb(b.color, b.strength * k);
     const mix = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * t);
     this.grade.setFillStyle((mix(0) << 16) | (mix(1) << 8) | mix(2), 1);
     this.darkness = a.darkness + (b.darkness - a.darkness) * t;
     // Additive sky light: the glow colour of whichever key is closer, faded by amount.
     const g = t < 0.5 ? a : b;
     const [gr, gg, gb] = PALETTE_RGB[COLOR_INDEX[g.glow]];
-    this.glow.setFillStyle((gr << 16) | (gg << 8) | gb, a.glowAlpha + (b.glowAlpha - a.glowAlpha) * t);
-    this.vignette.setAlpha(ATMOSPHERE.vignetteStrength + ATMOSPHERE.vignetteNight * this.darkness);
+    this.glow.setFillStyle((gr << 16) | (gg << 8) | gb, this.indoor ? 0 : a.glowAlpha + (b.glowAlpha - a.glowAlpha) * t);
+    this.vignette.setAlpha(ATMOSPHERE.vignetteStrength + ATMOSPHERE.vignetteNight * this.darkness * k);
 
     // Lights and emissive windows.
     const on = this.darkness > ATMOSPHERE.lightsOnThreshold;
@@ -144,7 +147,7 @@ export class Atmosphere {
 
   private updateFireflies(timeMs: number, deltaMs: number): void {
     const dt = deltaMs / 1000;
-    if (this.darkness > 0.6 && timeMs > this.nextFly && this.flies.length < ATMOSPHERE.fireflyMaxAlive) {
+    if (!this.indoor && this.darkness > 0.6 && timeMs > this.nextFly && this.flies.length < ATMOSPHERE.fireflyMaxAlive) {
       this.nextFly = timeMs + ATMOSPHERE.fireflySpawnEveryMs * (0.5 + Math.random());
       const v = this.view();
       const ox = v.x + Math.random() * v.width;

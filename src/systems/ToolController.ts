@@ -8,7 +8,7 @@ import { ITEM_TEXTURES } from '../art/items';
 import { audio } from '../audio/AudioManager';
 import { CROPS } from '../data/crops';
 import type { ToolKind } from '../data/items';
-import { TERRAIN } from '../data/terrain';
+import { TERRAIN, isWaterTerrain } from '../data/terrain';
 import type { ActionSpec, Player } from '../entities/Player';
 import type { Effects } from './Effects';
 import { EV, bus } from './events';
@@ -100,7 +100,7 @@ export class ToolController {
   }
 
   private isWater(cx: number, cy: number): boolean {
-    return this.map.inBounds(cx, cy) && !!TERRAIN[this.map.kindAt(cx, cy)].water;
+    return this.map.inBounds(cx, cy) && isWaterTerrain(TERRAIN[this.map.kindAt(cx, cy)]);
   }
 
   private wouldWork(tool: ToolKind | undefined, crop: string | undefined): boolean {

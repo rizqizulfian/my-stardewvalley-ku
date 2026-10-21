@@ -137,6 +137,7 @@ export class UIScene extends Phaser.Scene {
       this.started = true;
       blink.remove();
       void audio.unlock().then(() => audio.playSfx('start', 0.8));
+      uiState.started = true;
       bus.emit(EV.started);
       this.hotbar.setVisible(true);
       this.help.setVisible(true);

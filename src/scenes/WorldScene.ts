@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { DEBUG, RENDER, TIME } from '../config';
+import { DEBUG, PLAYER, RENDER, TIME } from '../config';
 import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
 import { PLAYER_CHARACTER } from '../data/characters';
+import type { Facing } from '../art/characters';
 import { MAPS } from '../data/maps';
-import type { MapDef } from '../data/maps/types';
+import type { MapDef, WarpDef } from '../data/maps/types';
 import { Player } from '../entities/Player';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
@@ -24,11 +25,21 @@ const T = RENDER.tileSize;
 const AMBIENCE_REFRESH_MS = 500;
 /** Cells from water at which the pond is inaudible. */
 const WATER_HEARING_CELLS = 7;
+/** The sea carries further; waves never drop below this share on the beach. */
+const WAVES_HEARING_CELLS = 16;
+const WAVES_FLOOR = 0.3;
 /** Player sprite's visual center sits this far above the feet. */
 const CAMERA_FOCUS_OFFSET_Y = 12;
 /** A ripe crop twinkles about this often (ms). */
 const RIPE_SPARKLE_MS = 900;
 const HOTBAR_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'ZERO'];
+const FADE_OUT_MS = 220;
+const FADE_IN_MS = 280;
+/** How far ahead of the feet (px) a step is checked against exits. */
+const WARP_PROBE = 3;
+
+/** Where the player appears after a map change (set just before the scene restarts). */
+let arrival: { x: number; y: number; face: Facing } | null = null;
 
 export class WorldScene extends Phaser.Scene {
   private def!: MapDef;
@@ -46,6 +57,7 @@ export class WorldScene extends Phaser.Scene {
   private started = false;
   private nextAmbience = 0;
   private nextSparkle = 0;
+  private leaving = false;
 
   constructor() {
     super('World');
@@ -60,13 +72,16 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(hex(this.def.backdrop));
     this.cameras.main.setRoundPixels(true);
 
-    const sx = this.def.spawn.x * T + T / 2;
-    const sy = (this.def.spawn.y + 1) * T - 2;
+    const spot = arrival ?? { ...this.def.spawn, face: 'down' as Facing };
+    arrival = null;
+    const sx = spot.x * T + T / 2;
+    const sy = (spot.y + 1) * T - 2;
     this.player = new Player(this, this.map, PLAYER_CHARACTER.texture, sx, sy);
+    this.player.facing = spot.face;
     this.player.onFootstep = (surface) => audio.footstep(surface);
 
     this.time2 = new TimeSystem(state);
-    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves);
+    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor);
     this.fx = new Effects(this);
     this.fx.collect = (id, qty) => {
       const left = addItem(state, id, qty);
@@ -112,18 +127,58 @@ export class WorldScene extends Phaser.Scene {
     bus.on(EV.farmChanged, onFarm);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off(EV.farmChanged, onFarm);
+      bus.off(EV.started, this.onStarted, this);
+      // Keys and pointer handlers belong to this map; the scene restarts on every map change.
+      this.input.keyboard?.removeAllKeys(true);
+      this.input.off('pointerdown');
+      this.input.off('wheel');
       this.fx.destroy();
       this.tools.destroy();
       this.farm.destroy();
+      this.rendered.destroy();
     });
 
     this.snapCamera();
-    bus.once(EV.started, () => {
-      this.started = true;
-      audio.playMusic(this.def.music[timeOfDay(state.minute)]);
-    });
+    this.cameras.main.fadeIn(FADE_IN_MS, 0, 0, 0);
+    this.leaving = false;
+    if (uiState.started) this.onStarted();
+    else bus.once(EV.started, this.onStarted, this);
     bus.on(EV.periodChanged, this.onPeriod, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off(EV.periodChanged, this.onPeriod, this));
+  }
+
+  private onStarted(): void {
+    this.started = true;
+    audio.playMusic(this.def.music[timeOfDay(state.minute)]);
+  }
+
+  /** Leave through an exit: fade out, switch map, restart the scene there. */
+  private warp(w: WarpDef): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    this.tools.enabled = false;
+    audio.playSfx(w.door ? 'door' : 'whoosh', 0.8);
+    arrival = { x: w.tx, y: w.ty, face: w.face ?? this.player.facing };
+    this.cameras.main.fadeOut(FADE_OUT_MS, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      state.mapId = w.to;
+      this.scene.restart();
+    });
+  }
+
+  /** The exit the player is stepping into, if any. */
+  private warpAt(dx: number, dy: number): WarpDef | undefined {
+    const fw = PLAYER.feetWidth;
+    const fh = PLAYER.feetHeight;
+    const bx = this.player.x - fw / 2 + Math.sign(dx) * WARP_PROBE;
+    const by = this.player.y - fh + Math.sign(dy) * WARP_PROBE;
+    return this.def.warps?.find((w) => {
+      const x0 = w.x * T;
+      const y0 = w.y * T;
+      const x1 = x0 + (w.w ?? 1) * T;
+      const y1 = y0 + (w.h ?? 1) * T;
+      return bx < x1 && bx + fw > x0 && by < y1 && by + fh > y0;
+    });
   }
 
   private onPeriod(): void {
@@ -132,7 +187,7 @@ export class WorldScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     const k = this.keys;
-    const active = this.started && !uiState.menuOpen;
+    const active = this.started && !uiState.menuOpen && !this.leaving;
     if (active) {
       const ff = k[DEBUG.fastForwardKey].isDown ? TIME.fastForwardMultiplier : 1;
       this.time2.update(delta, ff);
@@ -141,6 +196,10 @@ export class WorldScene extends Phaser.Scene {
       const wasMoving = this.player.isMoving;
       this.player.update(delta, { dx, dy });
       if (!wasMoving && this.player.isMoving) this.player.resetAnim();
+      if (dx || dy) {
+        const w = this.warpAt(dx, dy);
+        if (w) this.warp(w);
+      }
     } else {
       this.player.update(delta, { dx: 0, dy: 0 });
     }
@@ -172,7 +231,8 @@ export class WorldScene extends Phaser.Scene {
       this.nextAmbience = time + AMBIENCE_REFRESH_MS;
       const d = this.map.waterDistance(this.player.x, this.player.y);
       const water = Math.max(0, 1 - d / WATER_HEARING_CELLS);
-      audio.updateAmbience(state.minute, this.def.ambience, { water });
+      const waves = Math.max(WAVES_FLOOR, 1 - d / WAVES_HEARING_CELLS);
+      audio.updateAmbience(state.minute, this.def.ambience, { water, waves });
     }
   }
 
@@ -182,10 +242,11 @@ export class WorldScene extends Phaser.Scene {
 
   private target(): [number, number] {
     const cam = this.cameras.main;
-    const maxX = Math.max(0, this.map.pixelWidth - cam.width);
-    const maxY = Math.max(0, this.map.pixelHeight - cam.height);
-    const x = Phaser.Math.Clamp(Math.round(this.player.x) - Math.floor(cam.width / 2), 0, maxX);
-    const y = Phaser.Math.Clamp(Math.round(this.player.y) - CAMERA_FOCUS_OFFSET_Y - Math.floor(cam.height / 2), 0, maxY);
+    // Rooms smaller than the view sit in the middle of it.
+    const fit = (size: number, view: number, focus: number) =>
+      size <= view ? Math.round((size - view) / 2) : Phaser.Math.Clamp(focus - Math.floor(view / 2), 0, size - view);
+    const x = fit(this.map.pixelWidth, cam.width, Math.round(this.player.x));
+    const y = fit(this.map.pixelHeight, cam.height, Math.round(this.player.y) - CAMERA_FOCUS_OFFSET_Y);
     return [x, y];
   }
 

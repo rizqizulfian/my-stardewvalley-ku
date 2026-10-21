@@ -3,6 +3,8 @@
 // do not swing a tool in the world).
 
 export const uiState = {
+  /** The title prompt has been dismissed. */
+  started: false,
   menuOpen: false,
   hudRects: [] as Array<{ x: number; y: number; w: number; h: number }>,
 };

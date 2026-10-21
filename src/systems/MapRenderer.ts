@@ -9,9 +9,11 @@ import { hash2, valueNoise } from '../art/pixel';
 import {
   CLIFF_TILE,
   CORNER,
+  DOCK_TILE,
   DUAL_TILE_COUNT,
   FULL_VARIANTS,
   GRASS_VARIANTS,
+  INTERIOR_TILE,
   WATER_TILES_PER_FRAME,
   TERRAIN_TEXTURES,
   WATER_FRAMES,
@@ -23,7 +25,19 @@ import type { PlacedProp, WorldMap } from './WorldMap';
 const T = RENDER.tileSize;
 const HALF = T / 2;
 
-const GID = { grass: 1, meadow: 100, path: 200, water: 300, deep: 500, cliff: 600 } as const;
+const GID = {
+  grass: 1,
+  meadow: 100,
+  path: 200,
+  water: 300,
+  deep: 500,
+  cliff: 600,
+  sand: 700,
+  paved: 800,
+  sea: 900,
+  interior: 1100,
+  dock: 1200,
+} as const;
 
 export interface Swayer {
   sprite: Phaser.GameObjects.Sprite;
@@ -78,6 +92,11 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
     water: tm.addTilesetImage('water', TERRAIN_TEXTURES.water, T, T, 0, 0, GID.water)!,
     deep: tm.addTilesetImage('deep', TERRAIN_TEXTURES.deepWater, T, T, 0, 0, GID.deep)!,
     cliff: tm.addTilesetImage('cliff', TERRAIN_TEXTURES.cliff, T, T, 0, 0, GID.cliff)!,
+    sand: tm.addTilesetImage('sand', TERRAIN_TEXTURES.sand, T, T, 0, 0, GID.sand)!,
+    paved: tm.addTilesetImage('paved', TERRAIN_TEXTURES.paved, T, T, 0, 0, GID.paved)!,
+    sea: tm.addTilesetImage('sea', TERRAIN_TEXTURES.sea, T, T, 0, 0, GID.sea)!,
+    interior: tm.addTilesetImage('interior', TERRAIN_TEXTURES.interior, T, T, 0, 0, GID.interior)!,
+    dock: tm.addTilesetImage('dock', TERRAIN_TEXTURES.dock, T, T, 0, 0, GID.dock)!,
   };
   const layer = (name: string, tileset: Phaser.Tilemaps.Tileset, dual: boolean, depth: number) => {
     const l = tm.createBlankLayer(name, tileset, dual ? -HALF : 0, dual ? -HALF : 0, map.w + (dual ? 1 : 0), map.h + (dual ? 1 : 0))!;
@@ -85,10 +104,15 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
     return l;
   };
   const ground = layer('ground', ts.grass, false, DEPTH.ground);
+  const interior = layer('interior', ts.interior, false, DEPTH.ground + 0.05);
   const meadow = layer('meadow', ts.meadow, true, DEPTH.ground + 0.1);
+  const sand = layer('sand', ts.sand, true, DEPTH.ground + 0.15);
   const path = layer('path', ts.path, true, DEPTH.path);
+  const paved = layer('paved', ts.paved, true, DEPTH.path + 0.05);
   const water = layer('water', ts.water, true, DEPTH.water);
+  const sea = layer('sea', ts.sea, true, DEPTH.water + 0.05);
   const deep = layer('deep', ts.deep, true, DEPTH.water + 0.1);
+  const dock = layer('dock', ts.dock, false, DEPTH.water + 0.3);
   const cliffShadow = layer('cliffShadow', ts.cliff, false, DEPTH.cliff - 0.2);
   const edges = layer('edges', ts.cliff, false, DEPTH.cliff - 0.1);
   const edgesN = layer('edgesN', ts.cliff, false, DEPTH.cliff - 0.05);
@@ -96,9 +120,29 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
 
   const seed = map.def.seed;
 
+  // Interiors: floor boards, wall faces two cells tall, black void around the room.
+  const altWalls = map.def.interiorStyle === 'shop' ? INTERIOR_TILE.altOffset : 0;
+  const kindIs = (x: number, y: number, k: 'floor' | 'wall' | 'void') => map.inBounds(x, y) && TERRAIN[map.kindAt(x, y)].interior === k;
+  for (let y = 0; y < map.h; y++)
+    for (let x = 0; x < map.w; x++) {
+      const t = TERRAIN[map.kindAt(x, y)];
+      if (t.interior === 'void') interior.putTileAt(GID.interior + INTERIOR_TILE.void, x, y);
+      else if (t.interior === 'wall') {
+        const f = !kindIs(x, y + 1, 'wall') ? INTERIOR_TILE.wallLower : !kindIs(x, y - 1, 'wall') ? INTERIOR_TILE.wallTop : INTERIOR_TILE.wallUpper;
+        interior.putTileAt(GID.interior + altWalls + f, x, y);
+      } else if (t.interior === 'floor') {
+        let f: number = Math.floor(hash2(x, y, seed) * INTERIOR_TILE.floorVariants);
+        if (kindIs(x, y - 1, 'wall')) f = INTERIOR_TILE.floorShadowTop;
+        else if (kindIs(x - 1, y, 'void') || kindIs(x - 1, y, 'wall')) f = INTERIOR_TILE.floorShadowLeft;
+        else if (kindIs(x + 1, y, 'void') || kindIs(x + 1, y, 'wall')) f = INTERIOR_TILE.floorShadowRight;
+        interior.putTileAt(GID.interior + f, x, y);
+      }
+    }
+
   // Ground: grass variants, mostly plain so detail stays readable.
   for (let y = 0; y < map.h; y++)
     for (let x = 0; x < map.w; x++) {
+      if (TERRAIN[map.kindAt(x, y)].interior) continue;
       const r = hash2(x, y, seed);
       const v = r < 0.45 ? 0 : 1 + Math.floor(hash2(x, y, seed + 1) * (GRASS_VARIANTS - 1));
       ground.putTileAt(GID.grass + v, x, y);
@@ -109,6 +153,9 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
     !!TERRAIN[map.kindAt(x, y)].decor && valueNoise(x / 4.5, y / 4.5, seed + 9) < map.def.decor.meadow;
   const pathCell = (x: number, y: number) => !!TERRAIN[map.kindAt(x, y)].path;
   const waterCell = (x: number, y: number) => !!TERRAIN[map.kindAt(x, y)].water;
+  const sandCell = (x: number, y: number) => !!TERRAIN[map.kindAt(x, y)].sand;
+  const pavedCell = (x: number, y: number) => !!TERRAIN[map.kindAt(x, y)].paved;
+  const seaCell = (x: number, y: number) => !!TERRAIN[map.kindAt(x, y)].sea;
   const maskAt = (i: number, j: number, test: (x: number, y: number) => boolean) =>
     (test(i - 1, j - 1) ? CORNER.TL : 0) | (test(i, j - 1) ? CORNER.TR : 0) | (test(i - 1, j) ? CORNER.BL : 0) | (test(i, j) ? CORNER.BR : 0);
 
@@ -121,9 +168,26 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!waterCell(x + dx, y + dy)) return false;
     return true;
   };
+  const deepSeaCell = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!seaCell(x + dx, y + dy)) return false;
+    return true;
+  };
   const waterTiles: Array<{ i: number; j: number; tile: number }> = [];
+  const seaTiles: Array<{ i: number; j: number; tile: number }> = [];
   for (let j = 0; j <= map.h; j++)
     for (let i = 0; i <= map.w; i++) {
+      const sm = maskAt(i, j, sandCell);
+      if (sm) sand.putTileAt(GID.sand + (sm === FULL ? fullVariant(i, j, 41) : sm), i, j);
+      const vm = maskAt(i, j, pavedCell);
+      if (vm) paved.putTileAt(GID.paved + vm, i, j);
+      const om = maskAt(i, j, seaCell);
+      if (om) {
+        const tile = om === FULL ? fullVariant(i, j, 43) : om;
+        sea.putTileAt(GID.sea + tile, i, j);
+        seaTiles.push({ i, j, tile });
+      }
+      const dsm = maskAt(i, j, deepSeaCell);
+      if (dsm) deep.putTileAt(GID.deep + dsm, i, j);
       const mm = maskAt(i, j, meadowCell);
       if (mm) meadow.putTileAt(GID.meadow + (mm === FULL ? fullVariant(i, j, 31) : mm), i, j);
       const pm = maskAt(i, j, pathCell);
@@ -167,6 +231,15 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
         else if (lower(-1, 0)) edges.putTileAt(GID.cliff + CLIFF_TILE.edgeWest, x, y);
         if (lower(0, -1)) edgesN.putTileAt(GID.cliff + CLIFF_TILE.edgeNorth, x, y);
       }
+    }
+
+  // Pier planks.
+  for (let y = 0; y < map.h; y++)
+    for (let x = 0; x < map.w; x++) {
+      if (!TERRAIN[map.kindAt(x, y)].dock) continue;
+      const isDock = (cx: number, cy: number) => map.inBounds(cx, cy) && !!TERRAIN[map.kindAt(cx, cy)].dock;
+      const open = (isDock(x - 1, y) ? 0 : DOCK_TILE.left) | (isDock(x + 1, y) ? 0 : DOCK_TILE.right) | (isDock(x, y + 1) ? 0 : DOCK_TILE.end);
+      dock.putTileAt(GID.dock + open, x, y);
     }
 
   // Props.
@@ -333,6 +406,7 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
         nextWater = timeMs + ATMOSPHERE.waterFrameMs;
         waterFrame = (waterFrame + 1) % WATER_FRAMES;
         for (const w of waterTiles) water.putTileAt(GID.water + waterFrame * WATER_TILES_PER_FRAME + w.tile, w.i, w.j);
+        for (const w of seaTiles) sea.putTileAt(GID.sea + waterFrame * WATER_TILES_PER_FRAME + w.tile, w.i, w.j);
       }
       if (timeMs >= nextSway) {
         nextSway = timeMs + ATMOSPHERE.swayFrameMs / 3;
