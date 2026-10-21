@@ -1,5 +1,6 @@
-// The little tour after the opening story: the camera visits every place the
-// player can walk to, with its name and one line about what is there.
+// The little tour after the opening story: the camera visits the places the
+// player can walk to, with its name and one line about what is there. The
+// dancing dog's house is left out on purpose: it is a surprise.
 // Points are map cells; the camera glides from `from` to `to` during a stop.
 
 export interface TourStop {
@@ -43,8 +44,9 @@ export const TOUR_STOPS: TourStop[] = [
     map: 'town',
     title: 'Pasar Lembah',
     caption: 'Toko benih, warung, dan alun-alun kota. Belanja dan ngobrol di sini.',
-    from: { x: 12, y: 14 },
-    to: { x: 34, y: 14 },
+    // Kept on the east side, away from the dog's house in the west corner.
+    from: { x: 30, y: 10 },
+    to: { x: 34, y: 16 },
   },
   {
     map: 'park',
@@ -59,13 +61,6 @@ export const TOUR_STOPS: TourStop[] = [
     caption: 'Lukisan karya seniman lembah. Baca plakat di bawah tiap lukisan.',
     from: { x: 13, y: 6 },
     to: { x: 13, y: 6 },
-  },
-  {
-    map: 'dogroom',
-    title: 'Rumah Kecil',
-    caption: 'Seekor anjing kecil yang tak pernah berhenti berjoget. Ikut joget, yuk!',
-    from: { x: 7, y: 5 },
-    to: { x: 7, y: 5 },
   },
   {
     map: 'beach',
