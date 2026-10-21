@@ -14,7 +14,7 @@ import type { DialogRequest } from '../ui/DialogBox';
 import type { Effects } from './Effects';
 import { EV, bus } from './events';
 import { canGift, chat, giveGift, hasMet, hearts, pickLine } from './friendship';
-import type { GameState } from './GameState';
+import { isWet, type GameState } from './GameState';
 import { addItem, itemDef, selectedStack, takeFromSlot } from './Inventory';
 import type { WorldMap } from './WorldMap';
 
@@ -43,7 +43,7 @@ export class NpcSystem {
 
   private add(def: NpcDef, placed: boolean): Npc {
     const n = new Npc(this.scene, this.map, def, stopAt(def, this.state.minute)!, placed);
-    n.raining = this.state.weather === 'rain' && !this.map.def.indoor;
+    n.raining = isWet(this.state.weather) && !this.map.def.indoor;
     n.onNote = (x, y) => this.note(x, y);
     this.npcs.push(n);
     return n;

@@ -1,7 +1,7 @@
 // Letters that arrive in the farm mailbox overnight. Each is sent once (its
 // flag is `mail:<id>`) when its condition holds; some carry a small present.
 
-import type { GameState } from '../systems/GameState';
+import { isWet, type GameState } from '../systems/GameState';
 
 export interface Letter {
   id: string;
@@ -39,7 +39,7 @@ export const LETTERS: Letter[] = [
   {
     id: 'rain',
     from: 'Siti',
-    when: (s) => s.weather === 'rain',
+    when: (s) => isWet(s.weather),
     pages: [
       'Hujan! Kata Bapak, kalau hujan tanaman tidak perlu disiram. Hemat tenaga, kan?',
       'Tapi jangan lupa bawa caping. Hehe.',

@@ -108,6 +108,12 @@ target map at `tx, ty`. Rooms smaller than the view are centred.
   cows in the pasture east of the field (long hay barn, windmill, trough, duck pond) and Oyen the cat by the
   house. Pet them with X once a day. Cows give milk every day and sheep wool every three days when petted;
   hens and ducks lay an egg in their run each morning.
+* **Animal barn** (`data/maps/kandang.ts`, the red barn in the pasture): walk in through its doors. At 19:00, and
+  all day when it rains, storms or snows, the animals go round to the door and spend the time inside (coop corner
+  with nesting boxes, stalls with hay mangers); on wet days the eggs are laid in there.
+* **Weather** (`systems/Weather.ts`, `WEATHER` in `config.ts`): besides rain there are thunderstorms (heavier rain,
+  wind, lightning and thunder, a dim flash indoors) and, in winter, snow (falling flakes, snow lying on the ground,
+  fields are not watered). The clock shows the day's weather; the town board forecasts tomorrow's.
 * **Beehives** by the flower beds north of the field: pick honey with X, more three days later.
 * **Town**: a tiny house with a dancing dog on the west side (with its own song), the art museum
   (`data/maps/museum.ts`, open 9:00 to 18:00, read the plaques with X) and the park with its big fountain

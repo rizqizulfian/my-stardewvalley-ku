@@ -15,7 +15,7 @@ import type { Player } from '../entities/Player';
 import { PixelText } from '../ui/PixelText';
 import type { Effects } from './Effects';
 import { EV, bus } from './events';
-import type { GameState } from './GameState';
+import { isWet, type GameState } from './GameState';
 import { addItem, itemDef } from './Inventory';
 import { spendToolEnergy } from './needs';
 import type { WorldMap } from './WorldMap';
@@ -155,7 +155,7 @@ export class Fishing {
     this.fx.burst('drop', this.bx, this.by - 2, { count: 4, spread: 18, up: 30 });
     this.phase = 'waiting';
     this.t = 0;
-    const rain = this.state.weather === 'rain' ? 0.75 : 1;
+    const rain = isWet(this.state.weather) ? 0.75 : 1;
     this.biteAt = (FISHING.biteMinMs + Math.random() * (FISHING.biteMaxMs - FISHING.biteMinMs)) * rain;
   }
 
@@ -169,7 +169,7 @@ export class Fishing {
   }
 
   private startReeling(): void {
-    const raining = this.state.weather === 'rain';
+    const raining = isWet(this.state.weather);
     this.fish = rollFish(this.water, this.state.season, this.state.minute, raining);
     const diff = 'junk' in this.fish ? 0 : this.fish.difficulty;
     this.zoneW = Math.round(FISHING.zoneMax - (FISHING.zoneMax - FISHING.zoneMin) * diff);

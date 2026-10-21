@@ -53,7 +53,11 @@ export const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
 
 export const WEATHER = {
   /** Chance that a day is rainy, per season. */
-  rainChance: [0.25, 0.2, 0.3, 0.15],
+  rainChance: [0.25, 0.2, 0.3, 0.08],
+  /** Share of rainy days that turn into thunderstorms, per season. */
+  stormShare: [0.25, 0.4, 0.3, 0],
+  /** Chance of snow, per season (winter only). */
+  snowChance: [0, 0, 0, 0.4],
   /** The first days are always clear, so the farm can get started. */
   clearDays: 2,
 } as const;

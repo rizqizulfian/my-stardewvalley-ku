@@ -53,6 +53,6 @@ export class ClockPanel {
     this.clock.setText(formatClock(Math.floor(s.minute / 10) * 10));
     this.gold.setText(`${s.gold}g`);
     this.seasonIcon.setFrame(SEASON_ICONS[s.season]);
-    this.sunIcon.setFrame(s.weather === 'rain' ? UI_ICON.rain : timeOfDay(s.minute) === 'night' ? UI_ICON.moon : UI_ICON.sun);
+    this.sunIcon.setFrame(s.weather !== 'sun' ? UI_ICON[s.weather] : timeOfDay(s.minute) === 'night' ? UI_ICON.moon : UI_ICON.sun);
   }
 }

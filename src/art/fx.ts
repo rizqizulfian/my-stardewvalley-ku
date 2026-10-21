@@ -1,7 +1,7 @@
 // Particles, lights, vignette and UI pieces.
 
 import { RENDER } from '../config';
-import { PixelGrid, ditherPick, outline, shade, type TextureSink } from './pixel';
+import { PixelGrid, ditherPick, outline, shade, valueNoise, type TextureSink } from './pixel';
 import { PALETTE, RAMPS, type ColorName } from './palette';
 
 export const FX_TEXTURES = {
@@ -17,6 +17,8 @@ export const FX_TEXTURES = {
   ripple: 'fx-ripple',
   emote: 'fx-emote',
   rain: 'fx-rain',
+  snow: 'fx-snow',
+  snowCover: 'fx-snow-cover',
   splash: 'fx-splash',
   note: 'fx-note',
 } as const;
@@ -46,6 +48,8 @@ export const UI_ICON = {
   hunger: 9,
   thirst: 10,
   sleep: 11,
+  storm: 12,
+  snow: 13,
 } as const;
 
 export const PANEL_SLICE = 8;
@@ -192,6 +196,29 @@ function rainFrames(): PixelGrid[] {
   return [a, b];
 }
 
+/** Snowflakes: a speck, a little plus, a six-point star. */
+function snowFrames(): PixelGrid[] {
+  return [
+    new PixelGrid(5, 5).set(2, 2, 'cream'),
+    new PixelGrid(5, 5).set(2, 1, 'mist').set(1, 2, 'mist').set(3, 2, 'mist').set(2, 3, 'mist').set(2, 2, 'cream'),
+    new PixelGrid(5, 5).line(2, 0, 2, 4, 'mist').line(0, 2, 4, 2, 'mist').set(1, 1, 'foam').set(3, 3, 'foam').set(3, 1, 'foam').set(1, 3, 'foam').set(2, 2, 'cream'),
+  ];
+}
+
+/** Snow lying on the ground: soft drifts of white over whatever is below (tiles seamlessly). */
+function snowCover(): PixelGrid {
+  const S = 64;
+  const g = new PixelGrid(S, S);
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const v = valueNoise(x / 8, y / 8, 97, S / 8) * 0.7 + valueNoise(x / 3, y / 3, 98, S / 3) * 0.3;
+      // Mostly white; a few thin patches where the ground still shows, edged in cold blue.
+      if (v > 0.3) g.set(x, y, v < 0.36 && ditherPick(x, y, 0.5) ? 'foam' : 'cream');
+      else if (v > 0.24 && ditherPick(x, y, (v - 0.24) / 0.06)) g.set(x, y, 'foam');
+    }
+  return g;
+}
+
 function splashFrames(): PixelGrid[] {
   return [
     new PixelGrid(7, 4).set(3, 2, 'foam').set(2, 3, 'sky').set(4, 3, 'sky'),
@@ -278,7 +305,12 @@ function icons(): PixelGrid[] {
   thirst.set(3, 5, 'foam').set(3, 4, 'foam').set(6, 7, 'sea').set(5, 8, 'sea');
   const sleep = new PixelGrid(9, 9).fillEllipse(0, 2, 7, 7, 'lilac').fillEllipse(2, 1, 6, 6, null);
   sleep.set(1, 5, 'mist').fillRect(5, 0, 4, 1, 'mist').set(7, 1, 'mist').set(6, 2, 'mist').fillRect(5, 3, 4, 1, 'mist');
-  return [sun, moon, spring, summer, fall, winter, coin, rain, energy, hunger, thirst, sleep].map((g) => outline(g, { steps: 2 }));
+  // Weather: a dark cloud with a bolt, a cloud dropping snowflakes.
+  const storm = new PixelGrid(9, 9).fillEllipse(0, 0, 9, 5, 'mauve').fillEllipse(1, 0, 6, 3, 'haze');
+  storm.line(5, 4, 3, 6, 'gold').fillRect(3, 6, 3, 1, 'gold').line(5, 7, 4, 8, 'gold');
+  const snow = new PixelGrid(9, 9).fillEllipse(0, 0, 9, 5, 'haze').fillEllipse(1, 0, 6, 3, 'mist');
+  snow.set(2, 6, 'cream').set(5, 7, 'cream').set(3, 8, 'cream').set(6, 5, 'cream').set(7, 8, 'cream');
+  return [sun, moon, spring, summer, fall, winter, coin, rain, energy, hunger, thirst, sleep, storm, snow].map((g) => outline(g, { steps: 2 }));
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +329,8 @@ export function registerFx(sink: TextureSink): void {
   sink.sheet(FX_TEXTURES.emote, emoteFrames(), 15, 16);
   sink.sheet(FX_TEXTURES.rain, rainFrames(), 4, 9);
   sink.sheet(FX_TEXTURES.splash, splashFrames(), 7, 4);
+  sink.sheet(FX_TEXTURES.snow, snowFrames(), 5, 5);
+  sink.image(FX_TEXTURES.snowCover, snowCover());
   sink.sheet(FX_TEXTURES.note, noteFrames(), 8, 10);
 
   sink.image(UI_TEXTURES.panel, panel(false));

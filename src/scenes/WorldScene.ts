@@ -24,7 +24,7 @@ import { NpcSystem } from '../systems/NpcSystem';
 import { EV, bus } from '../systems/events';
 import { soilOf } from '../systems/farming';
 import { FarmView } from '../systems/FarmView';
-import { state } from '../systems/GameState';
+import { isWet, state, type Weather as WeatherKind } from '../systems/GameState';
 import { endDay } from '../systems/day';
 import { addItem, itemDef, selectSlot, selectedStack } from '../systems/Inventory';
 import { addNeed, walkFactor } from '../systems/needs';
@@ -36,6 +36,14 @@ import { ToolController } from '../systems/ToolController';
 import { overHud, uiState } from '../systems/uiState';
 import { WorldMap, type PlacedProp } from '../systems/WorldMap';
 import type { DialogRequest } from '../ui/DialogBox';
+
+/** The notice board's line about tomorrow. */
+const FORECAST: Record<WeatherKind, string> = {
+  sun: 'sunny.',
+  rain: 'rain. No need to water!',
+  storm: 'thunderstorms! Stay near a roof.',
+  snow: 'snow. Wrap up warm!',
+};
 
 const T = RENDER.tileSize;
 /** How often ambience levels are refreshed (ms). */
@@ -116,7 +124,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.time2 = new TimeSystem(state);
     this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor, this.def.interiorStyle === 'paper');
-    this.weather = new Weather(this, state.weather === 'rain', !!this.def.indoor);
+    this.weather = new Weather(this, state.weather, !!this.def.indoor, this.map.pixelWidth, this.map.pixelHeight);
     this.fx = new Effects(this);
     this.fx.collect = (id, qty) => {
       const left = addItem(state, id, qty);
@@ -133,7 +141,7 @@ export class WorldScene extends Phaser.Scene {
     ensureForage(state);
     this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
     this.tools.onPickup = (cx, cy) => this.gather.pickUp(cx, cy);
-    this.npcs.setRaining(state.weather === 'rain' && !this.def.indoor);
+    this.npcs.setRaining(isWet(state.weather) && !this.def.indoor);
     const box = this.map.props.find((p) => p.def.use === 'mailbox');
     if (box) {
       const [mx, my] = this.propCenter(box);
@@ -254,7 +262,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private playMusic(): void {
-    audio.playMusic(musicFor(this.def.music[timeOfDay(state.minute)], state.season, state.weather === 'rain'));
+    audio.playMusic(musicFor(this.def.music[timeOfDay(state.minute)], state.season, isWet(state.weather)));
   }
 
   /** Leave through an exit: fade out, switch map, restart the scene there. */
@@ -323,7 +331,7 @@ export class WorldScene extends Phaser.Scene {
         dialog({ pages: [this.def.sign ?? 'The sign is too weathered to read.'] });
         return true;
       case 'board':
-        dialog({ pages: [...(this.def.board ?? ['Nothing pinned up today.']), `Weather tomorrow: ${state.tomorrow === 'rain' ? 'rain. No need to water!' : 'sunny.'}`] });
+        dialog({ pages: [...(this.def.board ?? ['Nothing pinned up today.']), `Weather tomorrow: ${FORECAST[state.tomorrow]}`] });
         return true;
       case 'pick':
         return this.pickFruit(p);
@@ -539,10 +547,22 @@ export class WorldScene extends Phaser.Scene {
       const d = this.map.waterDistance(this.player.x, this.player.y);
       const water = Math.max(0, 1 - d / WATER_HEARING_CELLS);
       const waves = Math.max(WAVES_FLOOR, 1 - d / WAVES_HEARING_CELLS);
-      const rain = state.weather === 'rain';
-      const levels: Record<string, number> = rain
-        ? { ...this.def.ambience, birds: (this.def.ambience.birds ?? 0) * 0.15, gulls: (this.def.ambience.gulls ?? 0) * 0.3, crickets: 0, rain: this.def.indoor ? 0.35 : 1 }
-        : this.def.ambience;
+      const amb = this.def.ambience;
+      const inside = this.def.indoor ? 0.35 : 1;
+      const levels: Record<string, number> =
+        state.weather === 'sun'
+          ? amb
+          : state.weather === 'snow'
+            ? // Snow hushes everything but the wind.
+              { ...amb, birds: (amb.birds ?? 0) * 0.1, crickets: 0, wind: Math.max(amb.wind ?? 0, 0.6) * inside }
+            : {
+                ...amb,
+                birds: (amb.birds ?? 0) * 0.15,
+                gulls: (amb.gulls ?? 0) * 0.3,
+                crickets: 0,
+                rain: inside,
+                wind: state.weather === 'storm' ? Math.max(amb.wind ?? 0, 0.9) * inside : amb.wind ?? 0,
+              };
       audio.updateAmbience(state.minute, levels, { water, waves });
     }
   }

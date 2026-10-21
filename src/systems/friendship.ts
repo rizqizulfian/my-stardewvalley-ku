@@ -2,7 +2,7 @@
 // warmer lines.
 
 import { FRIENDSHIP, GIFT_LINES, type NpcDef } from '../data/npcs';
-import type { GameState, NpcState } from './GameState';
+import { isWet, type GameState, type NpcState } from './GameState';
 
 export type Taste = keyof typeof GIFT_LINES;
 
@@ -54,7 +54,7 @@ export function giveGift(s: GameState, def: NpcDef, item: string): Taste {
 /** Today's line for this person: weather first sometimes, else by friendship tier. */
 export function pickLine(s: GameState, def: NpcDef, rand: () => number = Math.random): string {
   const h = hearts(s, def.id);
-  if (s.weather === 'rain' && def.rain?.length && rand() < 0.6) return def.rain[Math.floor(rand() * def.rain.length)];
+  if (isWet(s.weather) && def.rain?.length && rand() < 0.6) return def.rain[Math.floor(rand() * def.rain.length)];
   const tier = h >= 6 ? 2 : h >= 3 ? 1 : 0;
   const pool = def.lines.slice(0, tier + 1).flat();
   // Favour the newest tier a little.

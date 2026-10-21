@@ -1,23 +1,37 @@
-// Rain on screen: slanted streaks falling through the view, little splashes
-// where they land, a cool grey grade and, now and then, a lightning flash.
-// Indoors there is nothing to see (the rain is only heard).
+// Weather on screen. Rain: slanted streaks with little splashes and a cool
+// grey grade. Storm: heavier, windier rain, a darker grade and lightning
+// with thunder (a dim flash through the windows indoors). Snow: flakes
+// drifting down and a white dusting on the ground. Indoors nothing falls.
 
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { FX_TEXTURES } from '../art/fx';
 import { audio } from '../audio/AudioManager';
+import type { Weather as WeatherKind } from './GameState';
 
-const RAIN = {
-  drops: 140,
+interface FallDef {
+  drops: number;
   /** Screen px per second. */
-  fall: 260,
-  drift: -70,
-  /** Multiply grade while it rains (cool grey-blue). */
-  grade: 0x9aa6bf,
-  splashMs: 160,
-  /** Average seconds between lightning flashes. */
-  lightningEvery: 70,
-} as const;
+  fall: number;
+  drift: number;
+  /** Multiply grade (cool grey-blue for rain, near white for snow). */
+  grade: number;
+  /** Average seconds between lightning flashes (0: none). */
+  lightningEvery: number;
+}
+
+const KINDS: Record<Exclude<WeatherKind, 'sun'>, FallDef> = {
+  rain: { drops: 140, fall: 260, drift: -70, grade: 0x9aa6bf, lightningEvery: 0 },
+  storm: { drops: 260, fall: 380, drift: -150, grade: 0x7c87a6, lightningEvery: 13 },
+  snow: { drops: 170, fall: 34, drift: -10, grade: 0xd6dff0, lightningEvery: 0 },
+};
+const SPLASH_MS = 160;
+/** Snowflakes sway side to side (px, ms per sway). */
+const SNOW_SWAY = { px: 10, ms: 2200 } as const;
+/** How strongly the snow lies on the ground. */
+const SNOW_COVER_ALPHA = 0.9;
+/** Flash brightness outdoors and through the windows. */
+const FLASH = { out: 0.7, in: 0.2 } as const;
 
 interface Drop {
   img: Phaser.GameObjects.Image;
@@ -25,6 +39,9 @@ interface Drop {
   y: number;
   /** Screen y where it lands. */
   land: number;
+  /** Snow: speed factor and sway phase. */
+  speed: number;
+  phase: number;
 }
 
 export class Weather {
@@ -32,39 +49,56 @@ export class Weather {
   private readonly splashes: Phaser.GameObjects.Image[] = [];
   private readonly grade: Phaser.GameObjects.Rectangle;
   private readonly flash: Phaser.GameObjects.Rectangle;
+  private readonly cover: Phaser.GameObjects.TileSprite | null = null;
+  private readonly def: FallDef | null;
   private nextFlash = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
-    readonly raining: boolean,
-    indoor: boolean,
+    readonly kind: WeatherKind,
+    private readonly indoor: boolean,
+    mapWidth: number,
+    mapHeight: number,
   ) {
     const { width, height } = scene.scale;
+    this.def = kind === 'sun' ? null : KINDS[kind];
     this.grade = scene.add
-      .rectangle(-4, -4, width + 8, height + 8, RAIN.grade)
+      .rectangle(-4, -4, width + 8, height + 8, this.def?.grade ?? 0xffffff)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(DEPTH.grade + 0.2)
       .setBlendMode(Phaser.BlendModes.MULTIPLY)
-      .setVisible(raining && !indoor);
+      .setVisible(!!this.def && !indoor);
     this.flash = scene.add
       .rectangle(-4, -4, width + 8, height + 8, 0xffffff)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(DEPTH.vignette + 0.5)
       .setAlpha(0);
-    if (!raining || indoor) return;
-    for (let i = 0; i < RAIN.drops; i++) {
-      const img = scene.add.image(0, 0, FX_TEXTURES.rain, i % 2).setScrollFactor(0).setDepth(DEPTH.particlesAbove).setAlpha(0.75);
-      const d: Drop = { img, x: 0, y: 0, land: 0 };
+    if (!this.def) return;
+    if (this.def.lightningEvery) this.nextFlash = scene.time.now + 3000 + this.flashGap() / 2;
+    if (indoor) return;
+    if (kind === 'snow') {
+      // Snow lies on the ground, under everything that stands on it.
+      this.cover = scene.add
+        .tileSprite(0, 0, mapWidth, mapHeight, FX_TEXTURES.snowCover)
+        .setOrigin(0, 0)
+        .setDepth(DEPTH.cliff + 0.5)
+        .setAlpha(SNOW_COVER_ALPHA);
+    }
+    for (let i = 0; i < this.def.drops; i++) {
+      const img =
+        kind === 'snow'
+          ? scene.add.image(0, 0, FX_TEXTURES.snow, i % 5 === 0 ? 2 : i % 2).setScrollFactor(0).setDepth(DEPTH.particlesAbove).setAlpha(0.9)
+          : scene.add.image(0, 0, FX_TEXTURES.rain, i % 2).setScrollFactor(0).setDepth(DEPTH.particlesAbove).setAlpha(kind === 'storm' ? 0.85 : 0.75);
+      const d: Drop = { img, x: 0, y: 0, land: 0, speed: 0.6 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2 };
       this.respawn(d, true);
       this.drops.push(d);
     }
-    this.nextFlash = scene.time.now + this.flashGap();
   }
 
   private flashGap(): number {
-    return RAIN.lightningEvery * 1000 * (0.5 + Math.random());
+    return (this.def?.lightningEvery ?? 0) * 1000 * (0.5 + Math.random());
   }
 
   private respawn(d: Drop, anywhere: boolean): void {
@@ -78,23 +112,51 @@ export class Weather {
     const { width, height } = this.scene.scale;
     this.grade.setSize(width + 8, height + 8);
     this.flash.setSize(width + 8, height + 8);
+    const def = this.def;
+    if (!def) return;
+    if (def.lightningEvery && timeMs > this.nextFlash) {
+      this.nextFlash = timeMs + this.flashGap();
+      this.strike();
+    }
     if (!this.drops.length) return;
     const dt = deltaMs / 1000;
+    const snow = this.kind === 'snow';
     for (const d of this.drops) {
-      d.x += RAIN.drift * dt;
-      d.y += RAIN.fall * dt;
+      if (snow) {
+        d.y += def.fall * d.speed * dt;
+        d.x += def.drift * dt;
+        if (d.y > height + 6) this.respawn(d, false);
+        const sway = Math.sin(timeMs / SNOW_SWAY.ms + d.phase) * SNOW_SWAY.px;
+        d.img.setPosition(Math.round(d.x + sway), Math.round(d.y));
+        continue;
+      }
+      d.x += def.drift * dt;
+      d.y += def.fall * dt;
       if (d.y >= d.land || d.y > height + 10) {
         if (d.y < height) this.splash(d.x, d.y + 8);
         this.respawn(d, false);
       }
       d.img.setPosition(Math.round(d.x), Math.round(d.y));
     }
-    if (timeMs > this.nextFlash) {
-      this.nextFlash = timeMs + this.flashGap();
-      this.flash.setAlpha(0.55);
-      this.scene.tweens.add({ targets: this.flash, alpha: 0, duration: 420, ease: 'Quad.easeOut' });
-      this.scene.time.delayedCall(700 + Math.random() * 1200, () => audio.playSfx('thunder', 0.8));
-    }
+  }
+
+  /** A double flash of lightning, then thunder: close ones crack at once, far ones rumble later. */
+  private strike(): void {
+    const peak = this.indoor ? FLASH.in : FLASH.out;
+    const near = Math.random() < 0.4;
+    this.flash.setAlpha(peak);
+    this.scene.tweens.add({
+      targets: this.flash,
+      alpha: 0,
+      duration: 160,
+      onComplete: () => {
+        this.flash.setAlpha(peak * 0.8);
+        this.scene.tweens.add({ targets: this.flash, alpha: 0, duration: 520, ease: 'Quad.easeOut' });
+      },
+    });
+    this.scene.time.delayedCall(near ? 120 : 900 + Math.random() * 1500, () =>
+      audio.playSfx(near ? 'thunderClap' : 'thunder', (near ? 1 : 0.75) * (this.indoor ? 0.6 : 1), 0.9 + Math.random() * 0.2),
+    );
   }
 
   private splash(x: number, y: number): void {
@@ -106,14 +168,15 @@ export class Weather {
     }
     s.setPosition(Math.round(x), Math.round(y)).setFrame(0).setVisible(true);
     const img = s;
-    this.scene.time.delayedCall(RAIN.splashMs / 2, () => img.setFrame(1));
-    this.scene.time.delayedCall(RAIN.splashMs, () => img.setVisible(false));
+    this.scene.time.delayedCall(SPLASH_MS / 2, () => img.setFrame(1));
+    this.scene.time.delayedCall(SPLASH_MS, () => img.setVisible(false));
   }
 
   destroy(): void {
     this.drops.forEach((d) => d.img.destroy());
     this.drops = [];
     this.splashes.forEach((s) => s.destroy());
+    this.cover?.destroy();
     this.grade.destroy();
     this.flash.destroy();
   }

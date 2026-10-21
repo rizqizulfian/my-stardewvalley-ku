@@ -73,7 +73,10 @@ export interface GameState {
   introSeen: boolean;
 }
 
-export type Weather = 'sun' | 'rain';
+export type Weather = 'sun' | 'rain' | 'storm' | 'snow';
+
+/** Rain and storms water the fields and send people under cover; snow does not. */
+export const isWet = (w: Weather): boolean => w === 'rain' || w === 'storm';
 
 export interface NpcState {
   /** Friendship points; every 100 is one heart. */

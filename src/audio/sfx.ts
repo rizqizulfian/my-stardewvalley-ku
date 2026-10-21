@@ -311,6 +311,12 @@ export const SFX: Record<string, SfxFn> = {
     burst(ctx, d, t, { type: 'lowpass', freq: 380 * p, q: 0.6, dur: 2.4, gain: 0.22, attack: 0.08, sweepTo: 90 * p });
     burst(ctx, d, t + 0.25, { type: 'lowpass', freq: 220 * p, q: 0.6, dur: 1.8, gain: 0.16, attack: 0.2 });
   },
+  /** A strike close by: a sharp crack, then the rumble rolls in. */
+  thunderClap: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'bandpass', freq: 1600 * p, q: 0.7, dur: 0.4, gain: 0.26, attack: 0.004, sweepTo: 380 * p });
+    burst(ctx, d, t + 0.05, { type: 'lowpass', freq: 520 * p, q: 0.6, dur: 2.8, gain: 0.28, attack: 0.03, sweepTo: 80 * p });
+    burst(ctx, d, t + 0.45, { type: 'lowpass', freq: 240 * p, q: 0.6, dur: 2.2, gain: 0.18, attack: 0.2 });
+  },
   buzz: (ctx, d, t, p) => {
     call(ctx, d, t, { type: 'sawtooth', pitch: [210 * p, 240 * p, 200 * p], dur: 0.7, gain: 0.05, formant: 900, q: 1, wobble: [28, 18] });
   },

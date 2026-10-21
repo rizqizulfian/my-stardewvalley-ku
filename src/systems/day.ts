@@ -7,7 +7,7 @@ import { CROPS, inSeason } from '../data/crops';
 import { LETTERS } from '../data/mail';
 import { advanceFarms } from './farming';
 import { hearts } from './friendship';
-import type { GameState, Weather } from './GameState';
+import { isWet, type GameState, type Weather } from './GameState';
 import { sellShipped, type SaleLine } from './shipping';
 
 export interface DaySummary {
@@ -46,7 +46,11 @@ function witherOutOfSeason(s: GameState): number {
 
 function rollWeather(s: GameState, rand: () => number): Weather {
   if (s.daysPlayed < WEATHER.clearDays) return 'sun';
-  return rand() < WEATHER.rainChance[s.season] ? 'rain' : 'sun';
+  const r = rand();
+  const snow = WEATHER.snowChance[s.season];
+  if (r < snow) return 'snow';
+  if (r < snow + WEATHER.rainChance[s.season]) return rand() < WEATHER.stormShare[s.season] ? 'storm' : 'rain';
+  return 'sun';
 }
 
 /** Letters for this morning go into the mailbox. */
@@ -70,8 +74,8 @@ export function endDay(s: GameState, passedOut: boolean, rand: () => number = Ma
   s.daysPlayed++;
   s.weather = s.tomorrow;
   s.tomorrow = rollWeather(s, rand);
-  // Rain waters every field for the new day.
-  advanceFarms(s, s.weather === 'rain');
+  // Rain and storms water every field for the new day.
+  advanceFarms(s, isWet(s.weather));
   const withered = newSeason ? witherOutOfSeason(s) : 0;
   deliverMail(s, newSeason);
 
