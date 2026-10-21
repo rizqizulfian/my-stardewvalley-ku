@@ -36,6 +36,10 @@ export class ToolController {
   enabled = true;
   /** The action button on a usable prop (bed, bench, shop...). Returns true if handled. */
   onUseProp: (p: PlacedProp) => boolean = () => false;
+  /** The action button near a villager, given the point in front of the player. Returns true if handled. */
+  onTalk: (px: number, py: number) => boolean = () => false;
+  /** Using the fishing rod. */
+  onCast: () => boolean = () => false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -87,7 +91,7 @@ export class ToolController {
     const st = selectedStack(this.state);
     const def = st ? itemDef(st.id) : null;
     const ripe = this.ripeAt(cx, cy);
-    const show = this.enabled && this.map.inBounds(cx, cy) && (ripe || def?.kind === 'tool' || def?.kind === 'seed');
+    const show = this.enabled && this.map.inBounds(cx, cy) && (ripe || (def?.kind === 'tool' && def.tool !== 'rod') || def?.kind === 'seed');
     this.cursor.setVisible(!!show);
     if (!show) return;
     this.cursor.setPosition(cx * T - 1, cy * T - 1);
@@ -141,6 +145,7 @@ export class ToolController {
     if (def.kind === 'seed' && def.crop) return this.plantAt(cx, cy, def.crop);
     if (def.food) return this.eat();
     if (def.kind !== 'tool' || !def.tool) return false;
+    if (def.tool === 'rod') return this.onCast();
     return this.swing(def.tool, cx, cy);
   }
 
@@ -148,6 +153,12 @@ export class ToolController {
   interact(): boolean {
     if (!this.enabled || this.player.busy) return false;
     const { cx, cy } = this.target;
+    // People first: the point just in front of the player, or the clicked cell.
+    const r = FARM.facingReach;
+    const f = this.player.facing;
+    const fx = this.player.x + (f === 'right' ? r : f === 'left' ? -r : 0);
+    const fy = this.player.y - PLAYER.feetHeight / 2 + (f === 'down' ? r : f === 'up' ? -r : 0) - 4;
+    if (this.mouseAim ? this.onTalk(cx * T + T / 2, cy * T + T / 2) : this.onTalk(fx, fy)) return true;
     if (this.ripeAt(cx, cy)) {
       if (this.mouseAim) this.player.face(cx * T + T / 2, cy * T + T / 2);
       return this.harvestAt(cx, cy);

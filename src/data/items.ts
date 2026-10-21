@@ -1,8 +1,8 @@
 // Item definitions. Icons are frames of the generated item sheet, looked up
 // by icon name (see art/items.ts).
 
-export type ToolKind = 'hoe' | 'can' | 'axe' | 'pickaxe' | 'scythe';
-export type ItemKind = 'tool' | 'seed' | 'produce' | 'resource' | 'food';
+export type ToolKind = 'hoe' | 'can' | 'axe' | 'pickaxe' | 'scythe' | 'rod';
+export type ItemKind = 'tool' | 'seed' | 'produce' | 'resource' | 'food' | 'fish' | 'forage';
 
 /** What eating or drinking one restores (need points, 0..100 scale; sleep is alertness). */
 export interface FoodEffect {
@@ -39,6 +39,7 @@ export const ITEMS: Record<string, ItemDef> = {
   axe: { id: 'axe', name: 'Axe', kind: 'tool', icon: 'axe', stack: 1, price: 0, tool: 'axe' },
   pickaxe: { id: 'pickaxe', name: 'Pickaxe', kind: 'tool', icon: 'pickaxe', stack: 1, price: 0, tool: 'pickaxe' },
   scythe: { id: 'scythe', name: 'Scythe', kind: 'tool', icon: 'scythe', stack: 1, price: 0, tool: 'scythe' },
+  rod: { id: 'rod', name: 'Fishing Rod', kind: 'tool', icon: 'rod', stack: 1, price: 0, tool: 'rod' },
 
   seedPadi: { id: 'seedPadi', name: 'Rice Seeds', kind: 'seed', icon: 'seedPadi', stack: STACK, price: 10, crop: 'padi' },
   seedJagung: { id: 'seedJagung', name: 'Corn Seeds', kind: 'seed', icon: 'seedJagung', stack: STACK, price: 15, crop: 'jagung' },
@@ -69,6 +70,27 @@ export const ITEMS: Record<string, ItemDef> = {
   mangga: { id: 'mangga', name: 'Mango', kind: 'food', icon: 'mangga', stack: STACK, price: 25, food: { hunger: 20, thirst: 20, energy: 5 } },
   jeruk: { id: 'jeruk', name: 'Orange', kind: 'food', icon: 'jeruk', stack: STACK, price: 20, food: { thirst: 30, hunger: 10, energy: 5 } },
   semangka: { id: 'semangka', name: 'Watermelon', kind: 'food', icon: 'semangka', stack: STACK, price: 20, food: { thirst: 45, energy: 5 } },
+
+  // Picked from trees around the valley.
+  jambu: { id: 'jambu', name: 'Rose Apple', kind: 'food', icon: 'jambu', stack: STACK, price: 20, food: { thirst: 25, hunger: 10, energy: 5 } },
+
+  // Fish. Pond fish in fresh water, sea fish off the beach and the dock.
+  ikanMas: { id: 'ikanMas', name: 'Carp', kind: 'fish', icon: 'ikanMas', stack: STACK, price: 45 },
+  lele: { id: 'lele', name: 'Catfish', kind: 'fish', icon: 'lele', stack: STACK, price: 55 },
+  nila: { id: 'nila', name: 'Tilapia', kind: 'fish', icon: 'nila', stack: STACK, price: 35 },
+  gurame: { id: 'gurame', name: 'Gourami', kind: 'fish', icon: 'gurame', stack: STACK, price: 80 },
+  kakap: { id: 'kakap', name: 'Red Snapper', kind: 'fish', icon: 'kakap', stack: STACK, price: 75 },
+  tongkol: { id: 'tongkol', name: 'Tuna', kind: 'fish', icon: 'tongkol', stack: STACK, price: 90 },
+  cumi: { id: 'cumi', name: 'Squid', kind: 'fish', icon: 'cumi', stack: STACK, price: 60 },
+  kerapu: { id: 'kerapu', name: 'Grouper', kind: 'fish', icon: 'kerapu', stack: STACK, price: 120 },
+  rumputLaut: { id: 'rumputLaut', name: 'Seaweed', kind: 'forage', icon: 'rumputLaut', stack: STACK, price: 8 },
+
+  // Forage: found lying around each morning.
+  kerang: { id: 'kerang', name: 'Seashell', kind: 'forage', icon: 'kerang', stack: STACK, price: 15 },
+  bintangLaut: { id: 'bintangLaut', name: 'Starfish', kind: 'forage', icon: 'bintangLaut', stack: STACK, price: 30 },
+  mutiara: { id: 'mutiara', name: 'Pearl', kind: 'forage', icon: 'mutiara', stack: STACK, price: 250 },
+  jamur: { id: 'jamur', name: 'Mushroom', kind: 'forage', icon: 'jamur', stack: STACK, price: 25, food: { hunger: 12, energy: 6 } },
+  pakis: { id: 'pakis', name: 'Fern Shoot', kind: 'forage', icon: 'pakis', stack: STACK, price: 18, food: { hunger: 8, energy: 4 } },
 
   wood: { id: 'wood', name: 'Wood', kind: 'resource', icon: 'wood', stack: STACK, price: 2 },
   stone: { id: 'stone', name: 'Stone', kind: 'resource', icon: 'stone', stack: STACK, price: 2 },

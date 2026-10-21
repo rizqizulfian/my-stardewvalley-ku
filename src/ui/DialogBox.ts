@@ -13,7 +13,7 @@ export interface DialogRequest {
   /** Called with the chosen index, or -1 if the box was dismissed. */
   onChoose?: (i: number) => void;
   onClose?: () => void;
-  /** Talk blip pitch (each NPC sounds a little different). */
+  /** Talk blip pitch ratio (each NPC sounds a little different). */
   voice?: number;
 }
 
@@ -141,7 +141,7 @@ export class DialogBox {
         const ch = this.text[Math.floor(this.shown) - 1];
         if (ch && ch !== ' ' && now - this.lastBlip > 70) {
           this.lastBlip = now;
-          audio.playSfx('talk', 0.35 * (this.req.voice ?? 1));
+          audio.playSfx('talk', 0.35, this.req.voice ?? 1);
         }
         this.render();
       }

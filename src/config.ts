@@ -61,7 +61,7 @@ export const NEEDS = {
   drain: { hunger: 0.06, thirst: 0.08, sleep: 0.07 },
   /** After midnight alertness falls this much faster. */
   lateSleepMultiplier: 2.5,
-  toolEnergy: { hoe: 2, can: 1, axe: 2, pickaxe: 2, scythe: 1 },
+  toolEnergy: { hoe: 2, can: 1, axe: 2, pickaxe: 2, scythe: 1, rod: 3 },
   /** Hard work makes you thirsty. */
   toolThirst: 0.4,
   /** Below this a need counts as low (warning, blinking bar). */
@@ -151,6 +151,8 @@ export const TOOL_TIMING = {
   swing: { frames: [110, 70, 170], impact: 2 },
   scythe: { frames: [70, 60, 140], impact: 1 },
   can: { frames: [110, 220, 220], impact: 1 },
+  /** Fishing cast: wind-up, throw; the hold pose stays until the line comes back. */
+  rod: { frames: [260, 180], impact: 1 },
 } as const;
 
 export const DROPS = {

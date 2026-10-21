@@ -51,6 +51,22 @@ export const ICON_NAMES = [
   'mangga',
   'jeruk',
   'semangka',
+  'rod',
+  'jambu',
+  'ikanMas',
+  'lele',
+  'nila',
+  'gurame',
+  'kakap',
+  'tongkol',
+  'cumi',
+  'kerapu',
+  'rumputLaut',
+  'kerang',
+  'bintangLaut',
+  'mutiara',
+  'jamur',
+  'pakis',
 ] as const;
 
 export function iconFrame(name: string): number {
@@ -77,6 +93,7 @@ export const TOOL_BEHIND: Record<ToolKind, Record<ToolView, readonly boolean[]>>
   pickaxe: { down: [true, false, false], up: [false, true, true], side: [false, false, false] },
   scythe: { down: [false, false, false], up: [true, true, true], side: [false, false, false] },
   can: { down: [false, false, false], up: [true, true, true], side: [false, false, false] },
+  rod: { down: [true, false, false], up: [false, true, true], side: [false, false, false] },
 };
 
 // ---------------------------------------------------------------------------
@@ -124,6 +141,7 @@ function headPixel(kind: ToolKind, du: number, v: number, mode: HeadMode): Color
       return du > -0.4 - curve ? light : mid;
     }
     case 'can':
+    case 'rod':
       return null;
   }
 }
@@ -150,6 +168,11 @@ function drawTool(g: PixelGrid, kind: ToolKind, p: ToolPose, hands: boolean): vo
         if (c) tool.set(x, y, c);
         continue;
       }
+      if (kind === 'rod') {
+        const c = rodPixel(u, v * litSign, p.len);
+        if (c) tool.set(x, y, c);
+        continue;
+      }
       const head = headPixel(kind, u - p.len, v, p.mode);
       if (head) {
         tool.set(x, y, head);
@@ -169,6 +192,16 @@ function drawTool(g: PixelGrid, kind: ToolKind, p: ToolPose, hands: boolean): vo
     if (kind !== 'can' && p.len > 6) put(p.gx + dx * 3, p.gy + dy * 3);
     g.stamp(outline(hand, { color: 'umber' }));
   }
+}
+
+/** Fishing rod in local coords: cork grip at the hands, a reel hanging under it, a thin bamboo rod with a red tip. */
+function rodPixel(u: number, v: number, len: number): ColorName | null {
+  if (u >= 0 && u <= 2.2 && v <= -0.9 && v >= -3) return v < -2.2 ? 'mauve' : 'haze';
+  if (u < -3 || u > len) return null;
+  if (u < 3) return Math.abs(v) <= 1 ? (v > 0 ? 'clay' : 'umber') : null;
+  if (Math.abs(v) > 0.62) return null;
+  if (u > len - 1.6) return 'brick';
+  return Math.floor(u) % 5 === 0 ? 'clay' : 'sand';
 }
 
 /** Watering can in local coords: spout forward along +u, top toward -v. */
@@ -199,7 +232,7 @@ function pose(gx: number, gy: number, angle: number, len: number, mode: HeadMode
 }
 
 /** Poses per view (down, up, side), three frames each: windup, mid, strike. */
-const SWING: Record<Exclude<ToolKind, 'can' | 'scythe'>, Record<ToolView, ToolPose[]>> = {
+const SWING: Record<Exclude<ToolKind, 'can' | 'scythe' | 'rod'>, Record<ToolView, ToolPose[]>> = {
   hoe: {
     down: [pose(20, 17, -90, 8, 'front'), pose(20, 24, -90, 4, 'front'), pose(20, 31, 90, 10, 'front')],
     up: [pose(20, 21, -90, 5, 'front'), pose(20, 21, -90, 8, 'front'), pose(20, 26, -90, 13, 'front')],
@@ -229,8 +262,27 @@ const CAN: Record<ToolView, ToolPose[]> = {
   side: [pose(23, 30, 0, 0), pose(24, 31, 35, 0), pose(24, 31, 45, 0)],
 };
 
+/** Fishing: wind-up behind the shoulder, the cast, then holding the line out over the water. */
+const ROD: Record<ToolView, ToolPose[]> = {
+  down: [pose(20, 25, -80, 16), pose(21, 30, 45, 15), pose(21, 31, 70, 13)],
+  up: [pose(20, 28, 95, 10), pose(20, 23, -75, 16), pose(20, 23, -88, 15)],
+  side: [pose(20, 28, -125, 16), pose(22, 29, -25, 16), pose(22, 30, -8, 16)],
+};
+
+/**
+ * Where the rod tip is in a frame, relative to the player's feet (for drawing
+ * the fishing line). Left-facing frames are mirrored.
+ */
+export function rodTip(view: ToolView, frame: number, flipped: boolean): [number, number] {
+  const p = ROD[view][frame];
+  const a = (p.angle * Math.PI) / 180;
+  const x = p.gx + Math.cos(a) * (p.len - 0.5) - TOOL_FRAME.feetX;
+  const y = p.gy + Math.sin(a) * (p.len - 0.5) - TOOL_FRAME.feetY;
+  return [Math.round(flipped ? -x - 1 : x), Math.round(y)];
+}
+
 function swingFrames(kind: ToolKind): PixelGrid[] {
-  const poses = kind === 'can' ? CAN : kind === 'scythe' ? SCYTHE : SWING[kind];
+  const poses = kind === 'can' ? CAN : kind === 'scythe' ? SCYTHE : kind === 'rod' ? ROD : SWING[kind];
   const frames: PixelGrid[] = [];
   for (const view of TOOL_VIEWS)
     for (const p of poses[view]) {
@@ -248,6 +300,7 @@ function toolIcon(kind: ToolKind): PixelGrid {
   const g = new PixelGrid(16, 16);
   if (kind === 'can') drawTool(g, 'can', pose(7, 9, 0, 0), false);
   else if (kind === 'scythe') drawTool(g, 'scythe', pose(4, 13, -70, 10), false);
+  else if (kind === 'rod') drawTool(g, 'rod', pose(3, 13, -48, 15), false);
   else drawTool(g, kind, pose(4, 13, -50, 10), false);
   return g;
 }
@@ -534,6 +587,146 @@ function watermelonIcon(): PixelGrid {
   return outline(g, { steps: 2 });
 }
 
+function jambuIcon(): PixelGrid {
+  // Bell-shaped water apple, glossy pink-red.
+  const m = blobMask(16, 16, [
+    [8, 10, 5, 5],
+    [8, 6, 3.5, 3],
+  ]);
+  const g = shade(m, ['wine', 'brick', 'rose', 'peach'], { rim: 0.35, gradient: 0.6 });
+  g.fillRect(6, 14, 5, 1, 'wine').set(7, 13, 'brick').set(9, 13, 'brick');
+  g.set(6, 7, 'cream').set(6, 8, 'peach');
+  g.line(8, 3, 9, 1, 'umber').fillRect(10, 1, 3, 2, 'leaf').set(12, 1, 'grass');
+  return outline(g, { steps: 2 });
+}
+
+interface FishLook {
+  ramp: [ColorName, ColorName, ColorName, ColorName];
+  fin: ColorName;
+  /** Body half-height and half-length. */
+  ry?: number;
+  rx?: number;
+  stripes?: ColorName;
+  spots?: ColorName;
+  whiskers?: boolean;
+  belly?: ColorName;
+}
+
+/** A fish swimming left: oval body, forked tail, fins, eye. */
+function fishIcon(f: FishLook): PixelGrid {
+  const rx = f.rx ?? 5;
+  const ry = f.ry ?? 3;
+  const cx = 7;
+  const cy = 8;
+  const m = blobMask(16, 16, [[cx, cy, rx, ry]]);
+  // Tail: a wedge that widens behind the body, notched at the end.
+  for (let i = 0; i < 4; i++)
+    for (let dy = -i - 1; dy <= i + 1; dy++) if (i < 3 || Math.abs(dy) > 1) m.set(cx + rx - 1 + i, cy + dy, 'ink');
+  const g = shade(m, f.ramp, { rim: 0.3, gradient: 0.55 });
+  if (f.belly) for (let x = cx - rx + 2; x < cx + rx - 1; x++) g.set(x, cy + ry - 1, f.belly);
+  if (f.stripes) for (let x = cx - 2; x < cx + rx - 1; x += 2) g.line(x, cy - ry + 1, x, cy + ry - 2, f.stripes);
+  if (f.spots) for (const [x, y] of [[cx - 1, cy - 1], [cx + 2, cy + 1], [cx + 1, cy - 2], [cx + 3, cy - 1], [cx - 2, cy + 1]]) g.set(x, y, f.spots);
+  // Dorsal and belly fins.
+  g.line(cx - 1, cy - ry, cx + 2, cy - ry - 1, f.fin).set(cx + 3, cy - ry, f.fin);
+  g.set(cx + 1, cy + ry, f.fin).set(cx + 2, cy + ry + 1, f.fin);
+  // Eye and gill.
+  const ex = cx - rx + 2;
+  g.set(ex, cy - 1, 'cream').set(ex, cy - 1, 'night');
+  g.set(ex - 1, cy - 1, 'cream');
+  g.line(ex + 2, cy - 1, ex + 2, cy + 1, f.ramp[0]);
+  if (f.whiskers) g.line(cx - rx - 1, cy + 1, cx - rx - 3, cy + 3, f.ramp[1]).line(cx - rx, cy + 1, cx - rx - 2, cy + 4, f.ramp[1]);
+  return outline(g, { steps: 2 });
+}
+
+function squidIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // Mantle pointing up-right, fins at the tip, tentacles trailing down-left.
+  const m = blobMask(16, 16, [
+    [10, 6, 3, 4.5],
+    [8, 9, 2.5, 2.5],
+  ]);
+  g.stamp(shade(m, ['wine', 'coral', 'peach', 'cream'], { rim: 0.3, gradient: 0.6 }));
+  g.fillRect(12, 1, 2, 2, 'coral').fillRect(7, 1, 2, 2, 'coral');
+  for (const [x0, len] of [[5, 5], [7, 6], [9, 5], [6, 4]] as Array<[number, number]>)
+    for (let i = 0; i < len; i++) g.set(x0 - Math.floor(i / 2), 11 + i, i % 2 ? 'peach' : 'coral');
+  g.set(8, 9, 'night').set(10, 9, 'night');
+  return outline(g, { steps: 2 });
+}
+
+function seaweedIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  for (const [x0, h, c] of [[4, 12, 'moss'], [8, 13, 'leaf'], [11, 10, 'moss']] as Array<[number, number, ColorName]>)
+    for (let i = 0; i < h; i++) {
+      const x = x0 + Math.round(Math.sin(i * 0.9) * 1.2);
+      g.set(x, 14 - i, c).set(x + 1, 14 - i, i % 3 === 0 ? 'grass' : c);
+    }
+  return outline(g, { steps: 2 });
+}
+
+function shellIcon(): PixelGrid {
+  // Scallop: a ribbed fan with a hinge.
+  const g = new PixelGrid(16, 16);
+  for (let y = 2; y < 13; y++)
+    for (let x = 1; x < 15; x++) {
+      const dx = x + 0.5 - 8;
+      const dy = y + 0.5 - 13;
+      const r = Math.hypot(dx, dy * 1.05);
+      if (r > 10.5 || dy > -1) continue;
+      const rib = Math.floor((Math.atan2(dy, dx) + Math.PI) * 3.2) % 2;
+      g.set(x, y, r > 9.4 ? 'coral' : rib ? 'peach' : 'cream');
+    }
+  g.fillRect(6, 12, 5, 2, 'coral').fillRect(5, 13, 7, 1, 'brick');
+  return outline(g, { steps: 2 });
+}
+
+function starfishIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + (k * Math.PI * 2) / 5;
+    for (let i = 0; i <= 6; i++) {
+      const x = Math.round(8 + Math.cos(a) * i);
+      const y = Math.round(8.5 + Math.sin(a) * i);
+      const w = i < 3 ? 1 : 0;
+      g.fillRect(x - w, y - w, 1 + w * 2, 1 + w * 2, i > 4 ? 'coral' : 'amber');
+    }
+  }
+  g.fillEllipse(6, 6, 5, 5, 'amber').set(8, 8, 'gold').set(7, 6, 'gold').set(10, 9, 'peach').set(6, 10, 'peach');
+  return outline(g, { steps: 2 });
+}
+
+function pearlIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // Open oyster with a pearl.
+  g.fillEllipse(1, 8, 14, 7, 'plum').fillEllipse(2, 8, 12, 5, 'haze').fillEllipse(3, 9, 10, 3, 'mist');
+  g.fillEllipse(2, 2, 12, 6, 'mauve').fillEllipse(3, 3, 10, 4, 'plum');
+  const p = shade(blobMask(16, 16, [[8, 9, 3, 3]]), ['haze', 'mist', 'cream', 'cream'], { rim: 0.4, gradient: 0.7 });
+  g.stamp(p).set(7, 7, 'cream').set(9, 10, 'lilac');
+  return outline(g, { steps: 2 });
+}
+
+function mushroomIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  g.fillRect(6, 8, 4, 6, 'mist').fillRect(6, 8, 1, 6, 'cream').fillRect(9, 8, 1, 6, 'haze');
+  const cap = blobMask(16, 16, [[8, 7, 6.5, 4]]);
+  for (let y = 8; y < 16; y++) for (let x = 0; x < 16; x++) cap.set(x, y, null);
+  g.stamp(shade(cap, ['bark', 'umber', 'clay', 'tan'], { rim: 0.35, gradient: 0.6 }));
+  g.line(2, 8, 13, 8, 'umber');
+  g.set(5, 5, 'sand').set(9, 4, 'sand').set(11, 6, 'sand');
+  g.fillRect(4, 14, 8, 1, 'leaf').set(3, 14, 'moss');
+  return outline(g, { steps: 2 });
+}
+
+function fernIcon(): PixelGrid {
+  const g = new PixelGrid(16, 16);
+  // A fiddlehead: a stalk curling into a spiral, with two small fronds.
+  g.line(7, 15, 8, 8, 'leaf').line(8, 15, 9, 8, 'grass');
+  const curl: Array<[number, number]> = [[9, 7], [10, 6], [10, 5], [9, 4], [8, 4], [7, 5], [7, 6], [8, 6], [9, 5]];
+  for (const [x, y] of curl) g.set(x, y, 'grass').set(x + 1, y, x > 8 ? 'leaf' : 'lime');
+  g.set(8, 5, 'lime');
+  for (const [x, y, d] of [[7, 11, -1], [9, 12, 1]] as Array<[number, number, number]>) g.line(x, y, x + d * 4, y - 2, 'leaf').set(x + d * 2, y - 2, 'grass');
+  return outline(g, { steps: 2 });
+}
+
 function icons(): PixelGrid[] {
   const make: Record<(typeof ICON_NAMES)[number], () => PixelGrid> = {
     hoe: () => toolIcon('hoe'),
@@ -585,6 +778,22 @@ function icons(): PixelGrid[] {
     mangga: mangoIcon,
     jeruk: orangeIcon,
     semangka: watermelonIcon,
+    rod: () => toolIcon('rod'),
+    jambu: jambuIcon,
+    ikanMas: () => fishIcon({ ramp: ['clay', 'amber', 'gold', 'cream'], fin: 'coral', ry: 3.4, belly: 'sand' }),
+    lele: () => fishIcon({ ramp: ['night', 'plum', 'mauve', 'haze'], fin: 'night', ry: 2.4, rx: 5.6, whiskers: true }),
+    nila: () => fishIcon({ ramp: ['pine', 'moss', 'mauve', 'haze'], fin: 'plum', stripes: 'plum', ry: 3.4 }),
+    gurame: () => fishIcon({ ramp: ['plum', 'mauve', 'haze', 'mist'], fin: 'coral', ry: 4, rx: 4.6, spots: 'night' }),
+    kakap: () => fishIcon({ ramp: ['wine', 'brick', 'coral', 'peach'], fin: 'brick', ry: 3.2, belly: 'peach' }),
+    tongkol: () => fishIcon({ ramp: ['deep', 'sea', 'haze', 'mist'], fin: 'deep', ry: 3, rx: 5.5, stripes: 'deep', belly: 'mist' }),
+    cumi: squidIcon,
+    kerapu: () => fishIcon({ ramp: ['bark', 'umber', 'clay', 'tan'], fin: 'umber', ry: 3.8, rx: 5, spots: 'coral' }),
+    rumputLaut: seaweedIcon,
+    kerang: shellIcon,
+    bintangLaut: starfishIcon,
+    mutiara: pearlIcon,
+    jamur: mushroomIcon,
+    pakis: fernIcon,
   };
   return ICON_NAMES.map((n) => make[n]());
 }
@@ -1093,7 +1302,7 @@ export function registerItemArt(sink: TextureSink): void {
     if (frames.length !== ripeStage(c) + 1) throw new Error(`[art] crop ${c.id} has ${frames.length} frames, expected ${ripeStage(c) + 1}`);
     sink.sheet(c.texture, frames, CW, CH);
   }
-  for (const kind of ['hoe', 'can', 'axe', 'pickaxe', 'scythe'] as const) sink.sheet(toolTexture(kind), swingFrames(kind), TOOL_FRAME.w, TOOL_FRAME.h, 3);
+  for (const kind of ['hoe', 'can', 'axe', 'pickaxe', 'scythe', 'rod'] as const) sink.sheet(toolTexture(kind), swingFrames(kind), TOOL_FRAME.w, TOOL_FRAME.h, 3);
   sink.sheet(ITEM_TEXTURES.cursor, [cursor('cream'), cursor('coral')], 18, 18);
   sink.sheet(ITEM_TEXTURES.bits, bits(), 4, 4);
 }

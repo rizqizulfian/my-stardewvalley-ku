@@ -24,7 +24,7 @@ export const SHOPS: Record<string, ShopDef> = {
     open: 9 * 60,
     close: 17 * 60,
     stock: ['seedPadi', 'seedJagung', 'seedCabai', 'seedTerong', 'seedMatahari', 'seedMawar', 'seedMelati'],
-    buys: ['produce', 'resource', 'seed'],
+    buys: ['produce', 'resource', 'seed', 'forage'],
     emptyText: 'No seeds grow in winter. See you in spring!',
   },
   warung: {
@@ -33,7 +33,8 @@ export const SHOPS: Record<string, ShopDef> = {
     open: 7 * 60,
     close: 22 * 60,
     stock: ['nasiGoreng', 'soto', 'pisangGoreng', 'esTeh', 'kopi', 'kelapa'],
-    buys: ['produce'],
+    // Bu Sari cooks with fresh fish and vegetables.
+    buys: ['produce', 'fish'],
   },
   buah: {
     id: 'buah',
@@ -41,6 +42,6 @@ export const SHOPS: Record<string, ShopDef> = {
     open: 8 * 60,
     close: 18 * 60,
     stock: ['pisang', 'mangga', 'jeruk', 'semangka'],
-    buys: ['produce', 'food'],
+    buys: ['produce', 'food', 'forage'],
   },
 };

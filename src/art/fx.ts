@@ -13,7 +13,16 @@ export const FX_TEXTURES = {
   lightWindow: 'light-window',
   vignette: 'fx-vignette',
   pixel: 'fx-pixel',
+  bobber: 'fx-bobber',
+  ripple: 'fx-ripple',
+  emote: 'fx-emote',
+  rain: 'fx-rain',
+  splash: 'fx-splash',
+  note: 'fx-note',
 } as const;
+
+/** Frames in the fx-emote sheet: speech bubbles over a character's head. */
+export const EMOTE = { alert: 0, question: 1, heart: 2, dots: 3, note: 4, angry: 5 } as const;
 
 export const UI_TEXTURES = {
   panel: 'ui-panel',
@@ -134,6 +143,68 @@ function vignetteCanvas(): HTMLCanvasElement {
   return c;
 }
 
+/** Red and white float: riding the water, then pulled under by a bite. */
+function bobberFrames(): PixelGrid[] {
+  const up = new PixelGrid(7, 9);
+  up.fillRect(3, 0, 1, 2, 'night');
+  up.fillEllipse(1, 2, 5, 3, 'brick').set(2, 2, 'coral');
+  up.fillEllipse(1, 4, 5, 3, 'cream').set(4, 5, 'mist');
+  up.fillRect(0, 7, 7, 1, 'foam').set(0, 7, null).set(6, 7, null);
+  const down = new PixelGrid(7, 9);
+  down.fillRect(3, 3, 1, 2, 'night');
+  down.fillEllipse(1, 5, 5, 3, 'brick').set(2, 5, 'coral');
+  down.fillRect(0, 7, 7, 1, 'foam').fillRect(1, 8, 5, 1, 'foam');
+  return [outline(up, { color: 'deep' }), outline(down, { color: 'deep' })];
+}
+
+function rippleFrames(): PixelGrid[] {
+  return [4, 8, 12].map((w, i) => {
+    const g = new PixelGrid(14, 6);
+    const x = 7 - w / 2;
+    g.fillEllipse(x, 3 - (i + 2) / 2, w, i + 2, 'foam').fillEllipse(x + 1, 3 - i / 2, w - 2, Math.max(1, i), null);
+    if (i === 2) g.forEachFilled((px, py) => ditherPick(px, py, 0.5) && g.set(px, py, null));
+    return g;
+  });
+}
+
+function bubble(draw: (g: PixelGrid) => void): PixelGrid {
+  const g = new PixelGrid(13, 14);
+  g.fillRect(1, 0, 11, 11, 'cream').fillRect(0, 1, 13, 9, 'cream');
+  g.fillRect(5, 11, 3, 1, 'cream').set(6, 12, 'cream');
+  draw(g);
+  return outline(g.resized(15, 16, 1, 1), { color: 'night' });
+}
+
+function emoteFrames(): PixelGrid[] {
+  const alert = bubble((g) => g.fillRect(5, 2, 3, 5, 'brick').fillRect(5, 8, 3, 2, 'brick').set(5, 2, 'coral'));
+  const question = bubble((g) => g.fillRect(4, 2, 5, 1, 'sea').fillRect(8, 3, 1, 2, 'sea').fillRect(6, 5, 2, 1, 'sea').fillRect(6, 6, 1, 1, 'sea').fillRect(6, 8, 1, 2, 'sea'));
+  const heart = bubble((g) => g.fillRect(3, 3, 3, 2, 'brick').fillRect(7, 3, 3, 2, 'brick').fillRect(3, 5, 7, 1, 'brick').fillRect(4, 6, 5, 1, 'brick').fillRect(5, 7, 3, 1, 'brick').set(6, 8, 'brick').set(4, 3, 'rose'));
+  const dots = bubble((g) => g.fillRect(2, 5, 2, 2, 'mauve').fillRect(6, 5, 2, 2, 'mauve').fillRect(10, 5, 2, 2, 'mauve'));
+  const note = bubble((g) => g.fillRect(8, 2, 1, 6, 'violet').fillRect(9, 2, 2, 1, 'violet').set(10, 3, 'violet').fillRect(5, 7, 4, 2, 'violet').set(5, 7, 'lilac'));
+  const angry = bubble((g) => g.line(3, 3, 5, 5, 'brick').line(9, 3, 7, 5, 'brick').line(4, 8, 8, 8, 'brick').line(8, 8, 9, 7, 'brick'));
+  return [alert, question, heart, dots, note, angry];
+}
+
+/** A rain streak, slanted with the wind, and the splash it makes. */
+function rainFrames(): PixelGrid[] {
+  const a = new PixelGrid(4, 9).line(3, 0, 1, 8, 'foam').set(3, 0, 'sky');
+  const b = new PixelGrid(4, 9).line(3, 2, 1, 8, 'sky').set(1, 8, 'foam');
+  return [a, b];
+}
+
+function splashFrames(): PixelGrid[] {
+  return [
+    new PixelGrid(7, 4).set(3, 2, 'foam').set(2, 3, 'sky').set(4, 3, 'sky'),
+    new PixelGrid(7, 4).set(1, 1, 'foam').set(5, 1, 'foam').set(0, 3, 'sky').set(6, 3, 'sky'),
+  ];
+}
+
+function noteFrames(): PixelGrid[] {
+  const a = new PixelGrid(6, 8).fillRect(3, 0, 1, 6, 'violet').fillRect(4, 0, 2, 1, 'violet').fillRect(0, 5, 4, 2, 'violet').set(0, 5, 'lilac');
+  const b = new PixelGrid(8, 8).fillRect(2, 1, 1, 5, 'rose').fillRect(6, 0, 1, 5, 'rose').line(2, 1, 6, 0, 'rose').fillRect(0, 5, 3, 2, 'rose').fillRect(4, 4, 3, 2, 'rose');
+  return [outline(a.resized(8, 10, 1, 1), { color: 'night' }), outline(b.resized(8, 10, 0, 1), { color: 'night' })];
+}
+
 // ---------------------------------------------------------------------------
 // UI pieces
 
@@ -221,6 +292,12 @@ export function registerFx(sink: TextureSink): void {
   sink.canvas(FX_TEXTURES.lightWindow, lightCanvas(48, 'peach', 5));
   sink.canvas(FX_TEXTURES.vignette, vignetteCanvas());
   sink.image(FX_TEXTURES.pixel, new PixelGrid(1, 1).set(0, 0, 'cream'));
+  sink.sheet(FX_TEXTURES.bobber, bobberFrames(), 7, 9);
+  sink.sheet(FX_TEXTURES.ripple, rippleFrames(), 14, 6);
+  sink.sheet(FX_TEXTURES.emote, emoteFrames(), 15, 16);
+  sink.sheet(FX_TEXTURES.rain, rainFrames(), 4, 9);
+  sink.sheet(FX_TEXTURES.splash, splashFrames(), 7, 4);
+  sink.sheet(FX_TEXTURES.note, noteFrames(), 8, 10);
 
   sink.image(UI_TEXTURES.panel, panel(false));
   sink.image(UI_TEXTURES.panelDark, panel(true));

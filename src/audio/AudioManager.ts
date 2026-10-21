@@ -247,10 +247,11 @@ export class AudioManager {
   // -------------------------------------------------------------------------
   // SFX
 
-  playSfx(name: string, gain = 1): void {
+  /** `pitch` scales the sound's frequencies (each NPC's voice blips at its own pitch). */
+  playSfx(name: string, gain = 1, pitch = 1): void {
     const fn = SFX[name];
     if (!fn || !this.started) return;
-    this.withGain(gain, (dest, t, p) => fn(this.ctx!, dest, t, p));
+    this.withGain(gain, (dest, t, p) => fn(this.ctx!, dest, t, p * pitch));
   }
 
   footstep(surface: Surface): void {

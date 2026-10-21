@@ -7,6 +7,7 @@ import { CHAR_FRAMES, buildCharacterFrames } from './characters';
 import { registerBuildings } from './buildings';
 import { registerFx } from './fx';
 import { registerItemArt } from './items';
+import { registerNpcArt } from './npcs';
 import type { TextureSink } from './pixel';
 import { registerProps } from './props';
 import { registerTerrain } from './terrain';
@@ -20,4 +21,5 @@ export function registerAllArt(sink: TextureSink): void {
   for (const c of CHARACTERS) {
     sink.sheet(c.texture, buildCharacterFrames(c.look), PLAYER.frameWidth, PLAYER.frameHeight, CHAR_FRAMES.perFacing);
   }
+  registerNpcArt(sink);
 }

@@ -218,6 +218,65 @@ export const SFX: Record<string, SfxFn> = {
     // A slow falling three-note lullaby.
     [784, 659, 523].forEach((hz, i) => tone(ctx, d, t + i * 0.32, hz * p, 0.6, 0.045, 'sine'));
   },
+  // Fishing ----------------------------------------------------------------
+  cast: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'bandpass', freq: 900 * p, q: 1.6, dur: 0.28, gain: 0.08, attack: 0.03, sweepTo: 3000 * p });
+    tone(ctx, d, t + 0.05, 1900 * p, 0.2, 0.012, 'triangle');
+  },
+  plop: (ctx, d, t, p) => {
+    thump(ctx, d, t, 520 * p, 1100 * p, 0.09, 0.1);
+    burst(ctx, d, t + 0.02, { type: 'bandpass', freq: 1500 * p, q: 1.3, dur: 0.18, gain: 0.05, sweepTo: 700 * p });
+  },
+  bite: (ctx, d, t, p) => {
+    thump(ctx, d, t, 380 * p, 900 * p, 0.07, 0.11);
+    burst(ctx, d, t, { type: 'bandpass', freq: 1700 * p, q: 1, dur: 0.22, gain: 0.08, sweepTo: 900 * p });
+    tone(ctx, d, t + 0.02, 1568 * p, 0.12, 0.05, 'square');
+  },
+  reelHit: (ctx, d, t, p) => {
+    tone(ctx, d, t, 988 * p, 0.12, 0.05, 'triangle');
+    tone(ctx, d, t + 0.05, 1319 * p, 0.16, 0.045, 'triangle');
+    burst(ctx, d, t, { type: 'bandpass', freq: 2400 * p, q: 3, dur: 0.05, gain: 0.04 });
+  },
+  reelMiss: (ctx, d, t, p) => {
+    thump(ctx, d, t, 240 * p, 150 * p, 0.14, 0.09, 'triangle');
+    burst(ctx, d, t, { type: 'bandpass', freq: 600 * p, q: 2, dur: 0.12, gain: 0.05 });
+  },
+  catch: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'bandpass', freq: 1400 * p, q: 0.9, dur: 0.3, gain: 0.09, sweepTo: 600 * p });
+    [0, 4, 7, 12].forEach((s, i) => tone(ctx, d, t + 0.1 + i * 0.08, semi(659, s) * p, 0.35, 0.045, 'triangle'));
+  },
+  escape: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'bandpass', freq: 1300 * p, q: 1, dur: 0.25, gain: 0.07, sweepTo: 500 * p });
+    [7, 3, 0].forEach((s, i) => tone(ctx, d, t + 0.08 + i * 0.1, semi(392, s) * p, 0.25, 0.04, 'triangle'));
+  },
+  // People -----------------------------------------------------------------
+  heart: (ctx, d, t, p) => {
+    tone(ctx, d, t, 1047 * p, 0.18, 0.04, 'sine');
+    tone(ctx, d, t + 0.09, 1319 * p, 0.25, 0.04, 'sine');
+  },
+  gift: (ctx, d, t, p) => {
+    [0, 4, 7].forEach((s, i) => tone(ctx, d, t + i * 0.07, semi(784, s) * p, 0.3, 0.04, 'triangle'));
+  },
+  ora: (ctx, d, t, p) => {
+    // A flurry of punches: fast low thumps with air.
+    for (let i = 0; i < 10; i++) {
+      const at = t + i * 0.055;
+      thump(ctx, d, at, (150 + (i % 3) * 30) * p, 60 * p, 0.06, 0.13);
+      burst(ctx, d, at, { type: 'bandpass', freq: 900 * p, q: 1.2, dur: 0.05, gain: 0.06 });
+    }
+  },
+  mail: (ctx, d, t, p) => {
+    tone(ctx, d, t, 1175 * p, 0.12, 0.04, 'triangle');
+    tone(ctx, d, t + 0.1, 1568 * p, 0.2, 0.04, 'triangle');
+  },
+  forage: (ctx, d, t, p) => {
+    thump(ctx, d, t, 700 * p, 1100 * p, 0.06, 0.05);
+    tone(ctx, d, t + 0.05, 1760 * p, 0.12, 0.025, 'triangle');
+  },
+  thunder: (ctx, d, t, p) => {
+    burst(ctx, d, t, { type: 'lowpass', freq: 380 * p, q: 0.6, dur: 2.4, gain: 0.22, attack: 0.08, sweepTo: 90 * p });
+    burst(ctx, d, t + 0.25, { type: 'lowpass', freq: 220 * p, q: 0.6, dur: 1.8, gain: 0.16, attack: 0.2 });
+  },
   whoosh: (ctx, d, t, p) => {
     burst(ctx, d, t, { type: 'bandpass', freq: 500 * p, q: 0.7, dur: 0.3, gain: 0.06, attack: 0.12, sweepTo: 1200 * p });
   },

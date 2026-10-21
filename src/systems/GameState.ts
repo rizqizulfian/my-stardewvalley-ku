@@ -49,6 +49,38 @@ export interface GameState {
   needs: Needs;
   /** Items in the shipping box, sold overnight. */
   shipped: ItemStack[];
+  /** Days since the game began (1 on the first day); used for regrowth timers. */
+  daysPlayed: number;
+  /** Friendship and today's talk/gift per NPC id. */
+  npcs: Record<string, NpcState>;
+  /** One-off story flags (rod received, letters sent, ...). */
+  flags: Record<string, boolean>;
+  weather: Weather;
+  /** Tomorrow's weather, decided overnight (the TV and the board can tell it). */
+  tomorrow: Weather;
+  /** Forage lying around today, per map. */
+  forage: Record<string, ForageSpot[]>;
+  /** Fruit picked per map: prop anchor cell -> daysPlayed when picked. */
+  picked: Record<string, Record<number, number>>;
+  /** Letters waiting in the mailbox (ids from data/mail.ts). */
+  mail: string[];
+  fishCaught: number;
+}
+
+export type Weather = 'sun' | 'rain';
+
+export interface NpcState {
+  /** Friendship points; every 100 is one heart. */
+  points: number;
+  /** daysPlayed of the last chat and the last gift. */
+  talked: number;
+  gifted: number;
+}
+
+export interface ForageSpot {
+  x: number;
+  y: number;
+  id: string;
 }
 
 export interface Needs {
@@ -78,6 +110,15 @@ export function newGameState(): GameState {
     removed: {},
     needs: { energy: NEEDS.max, hunger: 85, thirst: 80, sleep: NEEDS.max },
     shipped: [],
+    daysPlayed: 1,
+    npcs: {},
+    flags: {},
+    weather: 'sun',
+    tomorrow: 'sun',
+    forage: {},
+    picked: {},
+    mail: [],
+    fishCaught: 0,
   };
 }
 

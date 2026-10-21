@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { DEPTH, PLAYER } from '../config';
 import { CHAR_FRAMES, charFrame, type Facing } from '../art/characters';
-import { TOOL_BEHIND, TOOL_FRAME, TOOL_VIEWS, toolTexture, type ToolView } from '../art/items';
+import { TOOL_BEHIND, TOOL_FRAME, TOOL_VIEWS, rodTip, toolTexture, type ToolView } from '../art/items';
 import { PROP_TEXTURES } from '../art/props';
 import type { ToolKind } from '../data/items';
+import type { Box } from '../data/props';
 import type { Surface } from '../data/terrain';
 import { worldDepth } from '../systems/MapRenderer';
 import type { WorldMap } from '../systems/WorldMap';
@@ -22,6 +23,8 @@ export interface ActionSpec {
   /** Frame index at which onImpact fires. */
   impact: number;
   onImpact?: () => void;
+  /** Called after the last frame, when the player is free again. */
+  onEnd?: () => void;
 }
 
 interface RunningAction extends ActionSpec {
@@ -54,6 +57,10 @@ export class Player {
   private seatLift = 0;
   /** Walking speed factor (needs slow the player down). */
   speedFactor = 1;
+  /** A tool held still in one pose (the rod while the line is out). */
+  private held: { tool: ToolKind; frame: number } | null = null;
+  /** Extra blockers that move (NPCs). */
+  blocked: (b: Box) => boolean = () => false;
 
   /** Called on each footfall frame with the surface underfoot. */
   onFootstep: (surface: Surface) => void = () => {};
@@ -78,7 +85,31 @@ export class Player {
   }
 
   get busy(): boolean {
-    return this.action !== null;
+    return this.action !== null || this.held !== null;
+  }
+
+  /** Keep a tool out in a fixed frame until release(). */
+  hold(tool: ToolKind, frame: number): void {
+    this.held = { tool, frame };
+    this.moving = false;
+    this.sprite.setFrame(charFrame(this.facing, CHAR_FRAMES.use[1]));
+    this.showTool(tool, frame);
+    this.sync();
+  }
+
+  release(): void {
+    if (!this.held) return;
+    this.held = null;
+    this.tool.setVisible(false);
+    this.resetAnim();
+    this.sprite.setFrame(charFrame(this.facing, CHAR_FRAMES.idle[0]));
+  }
+
+  /** World position of the rod tip in the held pose. */
+  rodTip(): [number, number] {
+    const frame = this.held?.frame ?? 2;
+    const [dx, dy] = rodTip(toolView(this.facing), frame, this.facing === 'left');
+    return [Math.round(this.x) + dx, Math.round(this.y) + dy];
   }
 
   get seated(): boolean {
@@ -133,13 +164,16 @@ export class Player {
       this.tool.setVisible(false);
       return;
     }
+    this.showTool(a.tool, Math.min(a.frame, TOOL_FRAME.perView - 1));
+  }
+
+  private showTool(tool: ToolKind, f: number): void {
     const view = toolView(this.facing);
-    const f = Math.min(a.frame, TOOL_FRAME.perView - 1);
     this.tool
-      .setTexture(toolTexture(a.tool), TOOL_VIEWS.indexOf(view) * TOOL_FRAME.perView + f)
+      .setTexture(toolTexture(tool), TOOL_VIEWS.indexOf(view) * TOOL_FRAME.perView + f)
       .setFlipX(this.facing === 'left')
       .setVisible(true);
-    this.toolBehind = TOOL_BEHIND[a.tool][view][f];
+    this.toolBehind = TOOL_BEHIND[tool][view][f];
   }
 
   private toolBehind = false;
@@ -155,6 +189,7 @@ export class Player {
         this.action = null;
         this.tool.setVisible(false);
         this.resetAnim();
+        a.onEnd?.();
         return;
       }
       if (a.frame === a.impact) this.fireImpact();
@@ -170,7 +205,7 @@ export class Player {
     else this.facing = dy > 0 ? 'down' : 'up';
   }
 
-  private feet(x: number, y: number) {
+  feet(x = this.x, y = this.y): Box {
     return { x: x - PLAYER.feetWidth / 2, y: y - PLAYER.feetHeight, w: PLAYER.feetWidth, h: PLAYER.feetHeight };
   }
 
@@ -181,6 +216,10 @@ export class Player {
     }
     if (this.action) {
       this.updateAction(deltaMs);
+      this.sync();
+      return;
+    }
+    if (this.held) {
       this.sync();
       return;
     }
@@ -196,10 +235,11 @@ export class Player {
       else this.facing = dy > 0 ? 'down' : 'up';
 
       const step = PLAYER.walkSpeed * this.speedFactor * dt;
+      const free = (b: Box) => this.map.canOccupy(b, this.elevation) && !this.blocked(b);
       const nx = this.x + dx * step;
-      if (this.map.canOccupy(this.feet(nx, this.y), this.elevation)) this.x = nx;
+      if (free(this.feet(nx, this.y))) this.x = nx;
       const ny = this.y + dy * step;
-      if (this.map.canOccupy(this.feet(this.x, ny), this.elevation)) this.y = ny;
+      if (free(this.feet(this.x, ny))) this.y = ny;
       const e = this.map.elevationAtPx(this.x, this.y - PLAYER.feetHeight / 2);
       this.elevation = e;
     }

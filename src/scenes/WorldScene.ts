@@ -10,6 +10,8 @@ import type { MapDef, WarpDef } from '../data/maps/types';
 import { Player } from '../entities/Player';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
+import { Fishing } from '../systems/Fishing';
+import { NpcSystem } from '../systems/NpcSystem';
 import { EV, bus } from '../systems/events';
 import { soilOf } from '../systems/farming';
 import { FarmView } from '../systems/FarmView';
@@ -67,6 +69,8 @@ export class WorldScene extends Phaser.Scene {
   private farm!: FarmView;
   private fx!: Effects;
   private tools!: ToolController;
+  private npcs!: NpcSystem;
+  private fishing!: Fishing;
   private camX = 0;
   private camY = 0;
   private started = false;
@@ -105,6 +109,17 @@ export class WorldScene extends Phaser.Scene {
       return left;
     };
     this.tools = new ToolController(this, state, this.map, this.rendered, this.farm, this.player, this.fx);
+    this.npcs = new NpcSystem(this, this.map, state, this.fx);
+    this.player.blocked = (b) => this.npcs.blocked(b);
+    this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
+    this.tools.onCast = () => this.fishing.cast();
+    this.tools.onTalk = (px, py) => {
+      const n = this.npcs.at(px, py);
+      if (!n) return false;
+      this.player.face(n.x, n.y - 6);
+      this.npcs.talk(n, this.player.x, this.player.y, { openShop: (id) => this.openShop(id) });
+      return true;
+    };
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys(
@@ -126,9 +141,19 @@ export class WorldScene extends Phaser.Scene {
     };
     this.keys.X.on('down', interact);
     this.keys.F.on('down', interact);
+    // While the line is out, the use button hooks and reels (one press each).
+    const reel = () => {
+      if (this.started && !uiState.menuOpen && this.fishing.active) this.fishing.press();
+    };
+    this.keys.SPACE.on('down', reel);
+    this.keys.C.on('down', reel);
     this.input.mouse?.disableContextMenu();
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (!this.started || uiState.menuOpen || overHud(p.x, p.y)) return;
+      if (this.fishing.active) {
+        if (!p.rightButtonDown()) this.fishing.press();
+        return;
+      }
       this.tools.aim(p);
       if (p.rightButtonDown()) this.tools.interact();
       else this.tools.use();
@@ -144,6 +169,7 @@ export class WorldScene extends Phaser.Scene {
     // Resting on a bench brings energy back minute by minute.
     const onMinute = () => {
       if (this.player.seated) addNeed(state, 'energy', NEEDS.benchEnergy);
+      this.npcs.onMinute();
     };
     bus.on(EV.farmChanged, onFarm);
     bus.on(EV.passOut, onPassOut);
@@ -157,6 +183,8 @@ export class WorldScene extends Phaser.Scene {
       this.input.keyboard?.removeAllKeys(true);
       this.input.off('pointerdown');
       this.input.off('wheel');
+      this.fishing.destroy();
+      this.npcs.destroy();
       this.fx.destroy();
       this.tools.destroy();
       this.farm.destroy();
@@ -312,6 +340,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     this.tools.enabled = false;
+    this.fishing.cancel();
     if (this.player.seated) this.standUp();
     if (passedOut) bus.emit(EV.notice, "It's 2:00 am... you collapse from exhaustion.");
     audio.playSfx(passedOut ? 'bonk' : 'sleep', 0.8);
@@ -342,6 +371,7 @@ export class WorldScene extends Phaser.Scene {
       const dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       const dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
       if (this.player.seated && (dx || dy)) this.standUp();
+      if (this.fishing.active && (dx || dy)) this.fishing.cancel();
       this.player.speedFactor = walkFactor(state);
       const wasMoving = this.player.isMoving;
       this.player.update(delta, { dx, dy });
@@ -357,13 +387,15 @@ export class WorldScene extends Phaser.Scene {
     // Aim, then keep swinging while the use button is held.
     const p = this.input.activePointer;
     const pointerOk = active && !overHud(p.x, p.y);
-    const handsFree = active && !this.player.seated && time > uiState.blockUntil;
+    const handsFree = active && !this.player.seated && !this.fishing.active && time > uiState.blockUntil;
     this.tools.enabled = handsFree;
     this.tools.aim(pointerOk && this.pointerInside(p) ? p : null);
     this.tools.updateCursor();
     if (handsFree && !this.player.busy) {
       if (k.SPACE.isDown || k.C.isDown || (p.leftButtonDown() && pointerOk)) this.tools.use();
     }
+    if (!uiState.menuOpen) this.fishing.update(delta);
+    this.npcs.update(delta, this.player.x, this.player.y, this.player.feet());
     this.fx.update(delta, this.player.x, this.player.y);
     if (time > this.nextSparkle) {
       this.nextSparkle = time + RIPE_SPARKLE_MS;
