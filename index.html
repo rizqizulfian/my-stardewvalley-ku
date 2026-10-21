@@ -2,14 +2,26 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#1b1726" />
     <title>Lembah Padi</title>
     <style>
       html, body {
         margin: 0;
+        position: fixed;
+        inset: 0;
         height: 100%;
+        height: 100dvh;
         background: #1b1726; /* palette: ink */
         overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }
       #game {
         width: 100%;
@@ -21,11 +33,26 @@
       canvas {
         image-rendering: pixelated;
         image-rendering: crisp-edges;
+        touch-action: none;
       }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <script>
+      // iOS ignores user-scalable=no: block pinch and double-tap zoom by hand.
+      (function () {
+        var typing = function (e) { return e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName); };
+        var lastEnd = 0;
+        document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('touchmove', function (e) { if (e.touches.length > 1 && !typing(e)) e.preventDefault(); }, { passive: false });
+        document.addEventListener('touchend', function (e) {
+          var now = Date.now();
+          if (now - lastEnd < 300 && !typing(e)) e.preventDefault();
+          lastEnd = now;
+        }, { passive: false });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

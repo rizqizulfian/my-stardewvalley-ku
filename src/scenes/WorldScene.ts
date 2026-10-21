@@ -513,7 +513,9 @@ export class WorldScene extends Phaser.Scene {
 
     // Aim, then keep swinging while the use button is held.
     const p = this.input.activePointer;
-    const pointerOk = active && !overHud(p.x, p.y);
+    // A lifted finger keeps its last position, so touch only aims while it is down.
+    const touchIdle = p.wasTouch && !p.isDown;
+    const pointerOk = active && !touchIdle && !overHud(p.x, p.y);
     const handsFree = active && !this.player.seated && !this.fishing.active && time > uiState.blockUntil;
     this.tools.enabled = handsFree;
     this.tools.aim(pointerOk && this.pointerInside(p) ? p : null);
