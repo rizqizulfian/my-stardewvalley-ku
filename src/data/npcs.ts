@@ -493,8 +493,8 @@ export const NPCS: NpcDef[] = [
       'Silakan lihat-lihat. Tekan X di depan lukisan atau patung untuk membaca keterangannya.',
     ],
     lines: [
-      ['Lukisan "Senja di Sawah" itu favorit pengunjung. Coba lihat warnanya.', 'Jangan sentuh patungnya, ya. Kecuali topi Pak Petani. Katanya bawa untung.', 'Seni itu seperti bertani: sabar, dirawat setiap hari.'],
-      ['Potret nenek di dinding itu saya yang lukis. Mirip seseorang yang kamu kenal?'],
+      ['Lukisan "Senja di Sawah" itu favorit pengunjung. Coba lihat warnanya.', 'Jangan sentuh patungnya, ya. Kecuali topi Pak Petani. Katanya bawa untung.', 'Seni itu seperti bertani: sabar, dirawat setiap hari.', 'Sudah lihat ruang Van Gogh di ujung timur? Enam lukisannya saya salin, pelan-pelan, titik demi titik.', '"Sunflowers" cocok sekali di lembah ini. Bunga matahari, sawah emas... Van Gogh pasti betah di sini.'],
+      ['Potret nenek di dinding itu saya yang lukis. Mirip seseorang yang kamu kenal?', 'Semasa hidupnya Van Gogh hampir tidak pernah menjual lukisan. Sekarang semua orang mengenalnya. Teruslah berkarya, ya.'],
       ['Kalau kamu menemukan mutiara di pantai, saya ingin sekali melukisnya.'],
     ],
     loves: ['mutiara', 'mawar'],

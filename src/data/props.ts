@@ -3,6 +3,7 @@
 
 import { BUILDING_TEXTURES as B } from '../art/buildings';
 import { EXTRA_TEXTURES as X, PAINTINGS, SCULPTURES } from '../art/extras';
+import { VAN_GOGH } from '../art/vangogh';
 import { FARM_TEXTURES as FT, HIVE, WINDMILL } from '../art/farm';
 import { PROP_TEXTURES, bareTexture } from '../art/props';
 import type { ToolKind } from './items';
@@ -411,6 +412,13 @@ export const PROPS: Record<string, PropDef> = {
       { texture: X.painting, frame: i, footprint: { w: 2, h: 1 }, flat: true, offsetY: -1, use: `art:${id}` } satisfies PropDef,
     ]),
   ),
+  ...Object.fromEntries(
+    VAN_GOGH.map((id, i) => [
+      `vangogh-${id}`,
+      { texture: X.vanGogh, frame: i, footprint: { w: 3, h: 1 }, flat: true, offsetY: -1, use: `art:${id}` } satisfies PropDef,
+    ]),
+  ),
+  vanGoghBanner: { texture: X.vanGoghBanner, footprint: { w: 1, h: 1 }, flat: true, offsetY: -3 },
   ...Object.fromEntries(
     SCULPTURES.map((id, i) => [
       `sculpture-${id}`,
