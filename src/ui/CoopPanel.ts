@@ -81,8 +81,8 @@ function inviteLink(): string {
   url.hash = '';
   url.searchParams.set('room', coop.code);
   // Testing against a self-run broker: the friend needs it too.
-  const peer = new URLSearchParams(window.location.search).get('peer');
-  if (peer) url.searchParams.set('peer', peer);
+  const own = new URLSearchParams(window.location.search).get('mqtt');
+  if (own) url.searchParams.set('mqtt', own);
   return url.toString();
 }
 
@@ -135,7 +135,7 @@ function render(): void {
     <input id="lp-code" class="lp-code" maxlength="${COOP.codeLength}" autocomplete="off" autocapitalize="characters" value="${esc(invited)}" placeholder="ABCDE">
     <button data-act="join" ${busy ? 'disabled' : ''}>Join</button>
     ${status}
-    <p class="lp-note">Some strict networks (certain office, school or mobile networks) block player-to-player connections. If joining fails, try home Wi-Fi or a phone hotspot.</p>
+    <p class="lp-note">Works on Wi-Fi and mobile data. Everyone needs internet; the host's game must stay open.</p>
     <button data-act="close" class="lp-quiet">Back to the game</button>`;
 }
 
