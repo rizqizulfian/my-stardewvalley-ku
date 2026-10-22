@@ -1,9 +1,11 @@
-// Co-op for 2-4 players over WebRTC (PeerJS). One player hosts: their browser
-// owns the world (clock, weather, fields, the shared purse) and relays
-// everything between guests. Guests join with a short room code; nothing runs
-// on a server of ours, PeerJS's free public broker only introduces the peers.
+// Co-op for 2-4 players. One player hosts: their browser owns the world
+// (clock, weather, fields, the shared purse) and relays everything between
+// guests. Messages travel through a free public MQTT broker over a secure
+// WebSocket (the same kind of link a web chat uses), so it works on mobile
+// data and strict Wi-Fi where direct player-to-player links get blocked. No
+// server or account of ours; a room is just a set of topics named by its code.
 
-import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import mqtt, { type IClientOptions, type MqttClient } from 'mqtt';
 import type { DaySummary } from '../systems/day';
 import { EV, bus } from '../systems/events';
 import { state } from '../systems/GameState';
@@ -11,8 +13,8 @@ import { WorldSync, snapshot, type Change, type Touched, type WorldSnapshot } fr
 
 export const COOP = {
   maxPlayers: 4,
-  /** Peer ids on the public broker are global, so ours carry a prefix. */
-  idPrefix: 'lembah-padi-',
+  /** Topics on the public brokers are global, so ours carry a prefix. */
+  topicPrefix: 'lembah-padi/v1/',
   codeLength: 5,
   /** No 0/O or 1/I/L, so a code read out loud survives. */
   alphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
@@ -20,8 +22,15 @@ export const COOP = {
   /** A still player is re-sent this often, so late joiners see them. */
   poseIdleMs: 1000,
   syncMs: 200,
-  /** Relayed (TURN) connections can take a while to set up on mobile networks. */
-  connectTimeoutMs: 30000,
+  /** Reaching a broker. */
+  brokerTimeoutMs: 10000,
+  /** A room that exists answers at once (its marker is kept by the broker). */
+  roomCheckMs: 6000,
+  /** Then the host's game sends the world. */
+  welcomeMs: 15000,
+  /** A host that drops off this long (not just a hiccup) has left. */
+  hostGoneMs: 12000,
+  keepaliveS: 15,
   nameMax: 12,
 } as const;
 
@@ -62,7 +71,8 @@ type Msg =
   | { t: 'pose'; id: string; p: Pose }
   | { t: 'patch'; ch: Change[] }
   | { t: 'day'; summary: DaySummary }
-  | { t: 'bed'; id: string };
+  | { t: 'bed'; id: string }
+  | { t: 'closed' };
 
 /** Events on the game bus (see EV for the rest). */
 export const NET = {
@@ -97,27 +107,50 @@ export function cleanCode(raw: string): string {
     .slice(0, COOP.codeLength);
 }
 
-/** `?peer=localhost:9000` points at a self-run PeerJS server (handy for testing offline). */
 /**
- * How the two browsers find a path to each other. STUN works when both are on
- * ordinary home networks; mobile data and strict Wi-Fi need a TURN relay that
- * passes the (tiny) game traffic along. These are free public ones, tried in
- * turn; the TLS ones on 443/5349 get through most firewalls.
+ * Free public brokers, tried in this order when hosting. The room code's first
+ * letter says which one the room lives on, so friends land on the same one.
+ * `?mqtt=ws://localhost:8888` points everyone at a self-run broker (testing).
  */
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
-  { urls: ['stun:freestun.net:3478'] },
-  { urls: ['turn:freestun.net:3478', 'turns:freestun.net:5349'], username: 'free', credential: 'free' },
-  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
-  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443'], username: 'openrelayproject', credential: 'openrelayproject' },
-];
+function brokers(): string[] {
+  const own = new URLSearchParams(window.location.search).get('mqtt');
+  if (own) return [own];
+  return ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081/mqtt'];
+}
 
-function peerOptions(): PeerOptions {
-  const config = { iceServers: ICE_SERVERS };
-  const q = new URLSearchParams(window.location.search).get('peer');
-  if (!q) return { debug: 1, config };
-  const [host, port] = q.split(':');
-  return { host, port: Number(port) || 9000, path: '/', secure: false, debug: 1, config };
+function brokerOf(code: string): number {
+  return Math.max(0, COOP.alphabet.indexOf(code[0])) % brokers().length;
+}
+
+function codeOn(broker: number): string {
+  for (;;) {
+    const c = makeCode();
+    if (brokerOf(c) === broker) return c;
+  }
+}
+
+function connect(url: string, opts: IClientOptions): Promise<MqttClient> {
+  return new Promise((resolve, reject) => {
+    const client = mqtt.connect(url, { keepalive: COOP.keepaliveS, reconnectPeriod: 2000, connectTimeout: COOP.brokerTimeoutMs, clean: true, ...opts });
+    const timer = window.setTimeout(() => {
+      client.end(true);
+      reject(new Error('timeout'));
+    }, COOP.brokerTimeoutMs);
+    client.once('connect', () => {
+      window.clearTimeout(timer);
+      resolve(client);
+    });
+  });
+}
+
+function randomId(): string {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
+/** What travels to the host: who sent it, and the message. */
+interface Envelope {
+  f: string;
+  m: Msg | { t: 'bye' };
 }
 
 class Coop {
@@ -127,11 +160,14 @@ class Coop {
   players: PlayerInfo[] = [];
   /** A short status line for the panel ("Connecting...", errors). */
   status = '';
-  private peer: Peer | null = null;
-  /** Host: one connection per guest id. Guest: just the host under 'h'. */
-  private conns = new Map<string, DataConnection>();
-  /** Host: which player each guest connection belongs to. */
-  private connIds = new WeakMap<DataConnection, string>();
+  private client: MqttClient | null = null;
+  /** Topic root of the room. */
+  private base = '';
+  /** This browser's id on the broker. */
+  private cid = '';
+  /** Host: player id -> that guest's broker id. */
+  private guests = new Map<string, string>();
+  private hostGoneTimer = 0;
   private readonly sync = new WorldSync();
   private pose: Pose | null = null;
   private sentPose = '';
@@ -170,134 +206,148 @@ class Coop {
     bus.emit(NET.changed);
   }
 
-  /** Open a room. Resolves with its code once the broker has registered it. */
-  host(name: string): Promise<string> {
+  /** Open a room. Resolves with its code once a broker has it. */
+  async host(name: string): Promise<string> {
     this.leave();
     this.me = { id: 'h', name, slot: 0 };
     this.players = [this.me];
     this.changed('Opening a room...');
-    return new Promise((resolve, reject) => {
-      const tryOpen = (attempt: number) => {
-        const code = makeCode();
-        const peer = new Peer(COOP.idPrefix + code, peerOptions());
-        this.peer = peer;
-        peer.on('open', () => {
-          this.role = 'host';
-          this.code = code;
-          this.sync.reset(state);
-          this.startLoops();
-          this.changed('');
-          resolve(code);
-        });
-        peer.on('connection', (c) => this.onGuestConnection(c));
-        peer.on('error', (e) => {
-          if (e.type === 'unavailable-id' && attempt < 3) {
-            peer.destroy();
-            tryOpen(attempt + 1);
-            return;
-          }
-          if (this.role === 'host' && e.type !== 'peer-unavailable') {
-            this.changed(`Network trouble: ${e.type}`);
-            return;
-          }
-          if (this.role !== 'host') {
-            this.leave();
-            this.changed(errorText(e.type));
-            reject(new Error(e.type));
-          }
-        });
-        peer.on('disconnected', () => {
-          // Lost the broker only; guests already joined stay connected. Re-register so new ones can.
-          if (this.role === 'host' && !peer.destroyed) peer.reconnect();
-        });
-      };
-      tryOpen(0);
-    });
+    const urls = brokers();
+    for (let i = 0; i < urls.length; i++) {
+      const code = codeOn(i);
+      const base = COOP.topicPrefix + code;
+      this.cid = randomId();
+      let client: MqttClient;
+      try {
+        // If this browser vanishes, the broker itself takes the room marker down.
+        client = await connect(urls[i], { clientId: `lp-${this.cid}`, will: { topic: `${base}/room`, payload: '', retain: true, qos: 1 } });
+      } catch {
+        continue;
+      }
+      this.client = client;
+      this.base = base;
+      this.role = 'host';
+      this.code = code;
+      client.on('message', (topic, raw) => {
+        if (topic !== `${base}/h`) return;
+        const env = parse<Envelope>(raw);
+        if (env) this.onGuestMessage(env);
+      });
+      // Back after a dropped link: put the room marker up again.
+      client.on('connect', () => this.openRoom());
+      this.openRoom();
+      this.sync.reset(state);
+      this.startLoops();
+      this.changed('');
+      return code;
+    }
+    this.leave();
+    this.changed(STUCK.service);
+    throw new Error('no broker');
+  }
+
+  private openRoom(): void {
+    if (!this.isHost || !this.client) return;
+    this.client.subscribe(`${this.base}/h`);
+    this.client.publish(`${this.base}/room`, '1', { retain: true, qos: 1 });
   }
 
   /** Join a room by code. Resolves once the host has sent the world. */
-  join(rawCode: string, name: string): Promise<void> {
+  async join(rawCode: string, name: string): Promise<void> {
     this.leave();
     const code = cleanCode(rawCode);
+    const base = COOP.topicPrefix + code;
     this.changed('Connecting...');
+    this.cid = randomId();
+    const bye: Envelope = { f: this.cid, m: { t: 'bye' } };
+    let client: MqttClient;
+    try {
+      client = await connect(brokers()[brokerOf(code)], { clientId: `lp-${this.cid}`, will: { topic: `${base}/h`, payload: JSON.stringify(bye), qos: 1, retain: false } });
+    } catch {
+      this.leave();
+      this.changed(STUCK.service);
+      throw new Error('no broker');
+    }
+    this.client = client;
+    this.base = base;
+    this.changed('Looking for the room...');
     return new Promise((resolve, reject) => {
-      let settled = false;
+      let stage: 'room' | 'welcome' | 'in' = 'room';
+      let timer = window.setTimeout(() => fail(STUCK.room), COOP.roomCheckMs);
       const fail = (why: string) => {
-        if (settled) return;
-        settled = true;
+        if (stage === 'in') return;
+        window.clearTimeout(timer);
+        stage = 'in';
         this.leave();
         this.changed(why);
         reject(new Error(why));
       };
-      const peer = new Peer(peerOptions());
-      this.peer = peer;
-      // How far it got decides what to tell the player when it gives up.
-      let stage: 'service' | 'host' | 'link' | 'welcome' = 'service';
-      const timer = window.setTimeout(() => fail(STUCK[stage]), COOP.connectTimeoutMs);
-      peer.on('error', (e) => {
-        if (!settled) {
-          window.clearTimeout(timer);
-          fail(errorText(e.type));
+      client.on('message', (topic, raw) => {
+        if (topic === `${base}/room`) {
+          const up = raw.toString() === '1';
+          if (stage === 'room' && up) {
+            stage = 'welcome';
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => fail(STUCK.welcome), COOP.welcomeMs);
+            this.changed('Found the room, saying hello...');
+            this.send({ t: 'hello', name });
+          } else if (this.isGuest) this.hostSeen(up);
+          return;
         }
+        const msg = parse<Msg>(raw);
+        if (!msg) return;
+        if (stage === 'welcome' && msg.t === 'full') return fail(`That room is full (${COOP.maxPlayers} players).`);
+        if (stage === 'welcome' && msg.t === 'welcome') {
+          window.clearTimeout(timer);
+          stage = 'in';
+          this.role = 'guest';
+          this.code = code;
+          this.me = msg.you;
+          this.players = msg.players;
+          Object.assign(state, msg.world);
+          this.sync.reset(state);
+          this.startLoops();
+          this.changed('');
+          bus.emit(NET.joined, { at: msg.at } satisfies WelcomeInfo);
+          resolve();
+          return;
+        }
+        if (this.isGuest) this.onMessage('h', msg);
       });
-      peer.on('open', () => {
-        stage = 'host';
-        const c = peer.connect(COOP.idPrefix + code, { reliable: true, serialization: 'json' });
-        this.conns.set('h', c);
-        c.on('open', () => {
-          stage = 'welcome';
-          c.send({ t: 'hello', name } satisfies Msg);
-        });
-        c.on('iceStateChanged', (ice) => {
-          if (ice === 'checking' && stage === 'host') stage = 'link';
-          if (ice === 'failed' && !settled) {
-            window.clearTimeout(timer);
-            fail(STUCK.link);
-          }
-        });
-        c.on('data', (raw) => {
-          const msg = raw as Msg;
-          if (msg.t === 'full') {
-            window.clearTimeout(timer);
-            fail(`That room is full (${COOP.maxPlayers} players).`);
-            return;
-          }
-          if (msg.t === 'welcome') {
-            window.clearTimeout(timer);
-            settled = true;
-            this.role = 'guest';
-            this.code = code;
-            this.me = msg.you;
-            this.players = msg.players;
-            Object.assign(state, msg.world);
-            this.sync.reset(state);
-            this.startLoops();
-            this.changed('');
-            bus.emit(NET.joined, { at: msg.at } satisfies WelcomeInfo);
-            resolve();
-            return;
-          }
-          this.onMessage('h', msg);
-        });
-        c.on('close', () => {
-          if (settled && this.role === 'guest') {
-            this.leave();
-            this.changed('The host left the room.');
-            bus.emit(NET.lost, 'The host closed the room.');
-          }
-        });
-      });
+      // Inbox first, then the room marker (its kept copy arrives right after subscribing).
+      client.subscribe(`${base}/g/${this.cid}`, () => client.subscribe(`${base}/room`));
     });
+  }
+
+  /** Guests: the host's room marker went down (or came back up). */
+  private hostSeen(up: boolean): void {
+    window.clearTimeout(this.hostGoneTimer);
+    this.hostGoneTimer = 0;
+    if (up) return;
+    this.hostGoneTimer = window.setTimeout(() => {
+      if (!this.isGuest) return;
+      this.leave();
+      this.changed('The host left the room.');
+      bus.emit(NET.lost, 'The host closed the room.');
+    }, COOP.hostGoneMs);
   }
 
   /** Close the room or leave it. Solo play carries on from here. */
   leave(): void {
     for (const t of this.timers) window.clearInterval(t);
     this.timers = [];
-    for (const c of this.conns.values()) c.close();
-    this.conns.clear();
-    this.peer?.destroy();
-    this.peer = null;
+    window.clearTimeout(this.hostGoneTimer);
+    const c = this.client;
+    if (c) {
+      if (this.isHost) {
+        this.broadcast({ t: 'closed' });
+        c.publish(`${this.base}/room`, '', { retain: true, qos: 1 });
+      }
+      else c.publish(`${this.base}/h`, JSON.stringify({ f: this.cid, m: { t: 'bye' } } satisfies Envelope));
+      c.end(false);
+    }
+    this.client = null;
+    this.guests.clear();
     const was = this.role;
     this.role = 'solo';
     this.code = '';
@@ -310,42 +360,42 @@ class Coop {
   // ---------------------------------------------------------------------------
   // Host side
 
-  private onGuestConnection(c: DataConnection): void {
-    c.on('data', (raw) => {
-      const msg = raw as Msg;
-      const id = this.connIds.get(c);
-      if (msg.t === 'hello') {
-        if (id) return;
-        if (this.players.length >= COOP.maxPlayers) {
-          c.send({ t: 'full' } satisfies Msg);
-          window.setTimeout(() => c.close(), 500);
-          return;
-        }
-        const used = new Set(this.players.map((p) => p.slot));
-        const slot = [1, 2, 3].find((s) => !used.has(s)) ?? 1;
-        const you: PlayerInfo = { id: `g${slot}`, name: cleanName(msg.name) || `Friend ${slot}`, slot };
-        this.connIds.set(c, you.id);
-        // Hand over everything pending first, so the snapshot and later patches line up.
-        this.flush();
-        this.conns.set(you.id, c);
-        this.players.push(you);
-        c.send({ t: 'welcome', you, players: this.players, world: snapshot(state), at: this.pose } satisfies Msg);
-        this.broadcast({ t: 'roster', players: this.players }, you.id);
-        for (const [pid, p] of this.lastPoses) c.send({ t: 'pose', id: pid, p } satisfies Msg);
-        bus.emit(EV.notice, `${you.name} joined the farm!`);
-        this.changed();
-        return;
-      }
-      if (id) this.onMessage(id, msg);
-    });
-    c.on('close', () => this.dropGuest(c));
-    c.on('error', () => this.dropGuest(c));
+  private idOf(cid: string): string | undefined {
+    for (const [id, c] of this.guests) if (c === cid) return id;
+    return undefined;
   }
 
-  private dropGuest(c: DataConnection): void {
-    const id = this.connIds.get(c);
-    if (!id || this.conns.get(id) !== c) return;
-    this.conns.delete(id);
+  private onGuestMessage({ f: cid, m: msg }: Envelope): void {
+    const id = this.idOf(cid);
+    if (msg.t === 'bye') {
+      if (id) this.dropGuest(id);
+      return;
+    }
+    if (msg.t !== 'hello') {
+      if (id) this.onMessage(id, msg);
+      return;
+    }
+    if (id) return;
+    if (this.players.length >= COOP.maxPlayers) {
+      this.publishTo(cid, { t: 'full' });
+      return;
+    }
+    const used = new Set(this.players.map((p) => p.slot));
+    const slot = [1, 2, 3].find((s) => !used.has(s)) ?? 1;
+    const you: PlayerInfo = { id: `g${slot}`, name: cleanName(msg.name) || `Friend ${slot}`, slot };
+    // Hand over everything pending first, so the snapshot and later patches line up.
+    this.flush();
+    this.guests.set(you.id, cid);
+    this.players.push(you);
+    this.publishTo(cid, { t: 'welcome', you, players: this.players, world: snapshot(state), at: this.pose });
+    this.broadcast({ t: 'roster', players: this.players }, you.id);
+    for (const [pid, p] of this.lastPoses) this.publishTo(cid, { t: 'pose', id: pid, p });
+    bus.emit(EV.notice, `${you.name} joined the farm!`);
+    this.changed();
+  }
+
+  private dropGuest(id: string): void {
+    if (!this.guests.delete(id)) return;
     this.lastPoses.delete(id);
     const name = this.nameOf(id);
     this.players = this.players.filter((p) => p.id !== id);
@@ -385,7 +435,8 @@ class Coop {
           // Everyone else gets it; the sender gets it back (minus gold) so all end up equal.
           this.broadcast(msg, from);
           const echo = msg.ch.filter(([k]) => k !== 'gold');
-          if (echo.length) this.conns.get(from)?.send({ t: 'patch', ch: echo } satisfies Msg);
+          const cid = this.guests.get(from);
+          if (echo.length && cid) this.publishTo(cid, { t: 'patch', ch: echo });
         }
         this.onTouched(touched);
         break;
@@ -406,6 +457,13 @@ class Coop {
       case 'day':
         bus.emit(NET.day, msg.summary);
         break;
+      case 'closed':
+        if (this.isGuest) {
+          this.leave();
+          this.changed('The host left the room.');
+          bus.emit(NET.lost, 'The host closed the room.');
+        }
+        break;
       case 'bed':
         if (this.isHost) bus.emit(EV.notice, `${this.nameOf(msg.id)} is in bed. Sleep when you are ready.`);
         break;
@@ -423,14 +481,21 @@ class Coop {
     bus.emit(NET.touched, t);
   }
 
+  /** Guest: to the host. */
   private send(msg: Msg): void {
-    const c = this.conns.get('h');
-    if (c?.open) c.send(msg);
+    this.client?.publish(`${this.base}/h`, JSON.stringify({ f: this.cid, m: msg } satisfies Envelope));
+  }
+
+  /** Host: to one guest's inbox. */
+  private publishTo(cid: string, msg: Msg): void {
+    this.client?.publish(`${this.base}/g/${cid}`, JSON.stringify(msg));
   }
 
   /** Host: to every guest but `except`. */
   private broadcast(msg: Msg, except?: string): void {
-    for (const [id, c] of this.conns) if (id !== except && c.open) c.send(msg);
+    if (!this.client) return;
+    const raw = JSON.stringify(msg);
+    for (const [id, cid] of this.guests) if (id !== except) this.client.publish(`${this.base}/g/${cid}`, raw);
   }
 
   /** Send world changes now. */
@@ -466,31 +531,20 @@ export function cleanName(raw: string): string {
   return raw.replace(/[^\w .'-]/g, '').trim().slice(0, COOP.nameMax);
 }
 
+function parse<T>(raw: Uint8Array): T | null {
+  try {
+    return JSON.parse(new TextDecoder().decode(raw)) as T;
+  } catch {
+    return null;
+  }
+}
+
 /** Why a join gave up, by how far it got. */
 const STUCK = {
   service: 'Could not reach the co-op service. Check your internet and try again.',
-  host: 'The room did not answer. Is the host\'s game still open in front (not in the background)? Check the code too.',
-  link: 'Found the room, but your networks would not let the two games connect. Try other Wi-Fi or mobile data on one side.',
-  welcome: 'Connected, but the host\'s game did not reply. Ask the host to bring the game tab to the front and try again.',
+  room: 'No room with that code. Check it with the host, and that their game is still open.',
+  welcome: "Found the room, but the host's game did not reply. Ask the host to keep the game in front and try again.",
 } as const;
-
-function errorText(type: string): string {
-  switch (type) {
-    case 'peer-unavailable':
-      return 'No room with that code. Check it with the host.';
-    case 'network':
-    case 'server-error':
-    case 'socket-error':
-    case 'socket-closed':
-      return 'Could not reach the co-op service. Check your internet.';
-    case 'browser-incompatible':
-      return 'This browser cannot do co-op. Try Chrome, Safari or Firefox.';
-    case 'webrtc':
-      return 'Could not connect to the other player (the network may block it).';
-    default:
-      return `Could not connect (${type}).`;
-  }
-}
 
 export const coop = new Coop();
 
