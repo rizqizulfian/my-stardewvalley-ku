@@ -13,6 +13,9 @@ import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
 import { DOG_BEAT_MS, DogDance } from '../entities/DogDance';
 import { Player } from '../entities/Player';
+import { RemotePlayer } from '../entities/RemotePlayer';
+import { NET, coop, type Pose, type WelcomeInfo } from '../net/coop';
+import type { Touched } from '../net/worldSync';
 import { AnimalSystem } from '../systems/AnimalSystem';
 import { Atmosphere } from '../systems/Atmosphere';
 import { Effects } from '../systems/Effects';
@@ -25,7 +28,7 @@ import { EV, bus } from '../systems/events';
 import { soilOf } from '../systems/farming';
 import { FarmView } from '../systems/FarmView';
 import { isWet, state, type Weather as WeatherKind } from '../systems/GameState';
-import { endDay } from '../systems/day';
+import { endDay, wakeNeeds, type DaySummary } from '../systems/day';
 import { addItem, itemDef, selectSlot, selectedStack } from '../systems/Inventory';
 import { addNeed, walkFactor } from '../systems/needs';
 import { saveGame } from '../systems/save';
@@ -103,6 +106,10 @@ export class WorldScene extends Phaser.Scene {
   private nextAmbience = 0;
   private nextSparkle = 0;
   private leaving = false;
+  /** Co-op: everyone else in the room, by player id. */
+  private remotes = new Map<string, RemotePlayer>();
+  /** Co-op guest: in bed, waiting for the host to end the day. */
+  private waitingInBed = false;
 
   constructor() {
     super('World');
@@ -142,7 +149,8 @@ export class WorldScene extends Phaser.Scene {
     this.animals = new AnimalSystem(this, this.map, state, this.fx);
     this.player.blocked = (b) => this.npcs.blocked(b) || this.animals.blocked(b) || !!this.dog?.blocks(b);
     this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
-    ensureForage(state);
+    // The host spreads each day's forage; guests are sent theirs.
+    if (!coop.isGuest) ensureForage(state);
     this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
     this.tools.onPickup = (cx, cy) => this.gather.pickUp(cx, cy);
     this.npcs.setRaining(isWet(state.weather) && !this.def.indoor);
@@ -182,7 +190,7 @@ export class WorldScene extends Phaser.Scene {
       }),
     );
     this.keys[DEBUG.nextDayKey].on('down', () => {
-      if (this.started && !uiState.menuOpen) this.sleep(false);
+      if (this.started && !uiState.menuOpen && !coop.isGuest) this.sleep(false);
     });
     const interact = () => {
       if (this.started && !uiState.menuOpen) this.tools.interact();
@@ -223,10 +231,27 @@ export class WorldScene extends Phaser.Scene {
     bus.on(EV.farmChanged, onFarm);
     bus.on(EV.passOut, onPassOut);
     bus.on(EV.minute, onMinute);
+    bus.on(NET.pose, this.onRemotePose, this);
+    bus.on(NET.changed, this.onRoster, this);
+    bus.on(NET.touched, this.onTouched, this);
+    bus.on(NET.day, this.wakeWithHost, this);
+    bus.on(NET.joined, this.onJoined, this);
+    bus.on(NET.lost, this.onLost, this);
+    coop.followMinute = (m) => this.time2.follow(m);
+    this.waitingInBed = false;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off(EV.farmChanged, onFarm);
       bus.off(EV.passOut, onPassOut);
       bus.off(EV.minute, onMinute);
+      bus.off(NET.pose, this.onRemotePose, this);
+      bus.off(NET.changed, this.onRoster, this);
+      bus.off(NET.touched, this.onTouched, this);
+      bus.off(NET.day, this.wakeWithHost, this);
+      bus.off(NET.joined, this.onJoined, this);
+      bus.off(NET.lost, this.onLost, this);
+      coop.followMinute = (m) => (state.minute = m);
+      for (const r of this.remotes.values()) r.destroy();
+      this.remotes.clear();
       bus.off(EV.started, this.onStarted, this);
       // Keys and pointer handlers belong to this map; the scene restarts on every map change.
       this.input.keyboard?.removeAllKeys(true);
@@ -317,8 +342,19 @@ export class WorldScene extends Phaser.Scene {
     if (use.startsWith('shop:')) return this.openShop(use.slice(5));
     switch (use) {
       case 'bed':
+        if (coop.isGuest) {
+          dialog({
+            pages: [`Go to bed? The new day starts when ${coop.nameOf('h')} (the host) goes to sleep too.`],
+            choices: ['Sleep', 'Not yet'],
+            onChoose: (i) => i === 0 && this.waitInBed(),
+          });
+          return true;
+        }
         dialog({
-          pages: [state.minute < 18 * 60 ? 'Go to bed already? The day will end.' : 'Go to sleep for the night?'],
+          pages: [
+            state.minute < 18 * 60 ? 'Go to bed already? The day will end.' : 'Go to sleep for the night?',
+            ...(coop.others.length ? ['(Everyone on the farm will wake up to the new day with you.)'] : []),
+          ],
           choices: ['Sleep', 'Not yet'],
           onChoose: (i) => i === 0 && this.sleep(false),
         });
@@ -485,11 +521,125 @@ export class WorldScene extends Phaser.Scene {
       state.mapId = home.id;
       arrival = { x: home.spawn.x, y: home.spawn.y, face: 'left' };
       saveGame(state);
+      coop.newDay(summary);
       bus.emit(EV.newDay, state.day);
       bus.emit(EV.farmChanged);
       bus.once(EV.dayDone, () => this.scene.restart());
       bus.emit(EV.daySummary, summary);
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Co-op
+
+  private onRemotePose(id: string, p: Pose | null): void {
+    let r = this.remotes.get(id);
+    if (!p) {
+      r?.destroy();
+      this.remotes.delete(id);
+      return;
+    }
+    if (!r) {
+      const info = coop.players.find((x) => x.id === id);
+      if (!info) return;
+      r = new RemotePlayer(this, PLAYER_CHARACTER.texture, info.name, info.slot);
+      this.remotes.set(id, r);
+    }
+    const here = p.m === this.def.id;
+    r.setVisible(here);
+    if (here) r.set(p);
+  }
+
+  /** Someone left (or we left): drop their figure. */
+  private onRoster(): void {
+    for (const [id, r] of this.remotes)
+      if (!coop.players.some((p) => p.id === id)) {
+        r.destroy();
+        this.remotes.delete(id);
+      }
+  }
+
+  /** Redraw what another player changed on this map. */
+  private onTouched(t: Touched): void {
+    const id = this.def.id;
+    if (t.soil.has(id)) this.farm.refresh();
+    for (const [m, cell] of t.removed) {
+      if (m !== id) continue;
+      const p = this.map.props.find((q) => this.map.index(q.cx, q.cy) === cell);
+      if (!p) continue;
+      this.map.removeProp(p);
+      this.rendered.removeProp(p);
+    }
+    if (t.forage.has(id) || t.picked.has(id)) {
+      this.gather.destroy();
+      this.gather = new Gathering(this, this.map, state, this.rendered, this.fx);
+    }
+  }
+
+  /** Just joined a room: appear next to the host, in their world. */
+  private onJoined(info: WelcomeInfo): void {
+    const at = info.at;
+    if (at && MAPS[at.m]) {
+      state.mapId = at.m;
+      arrival = { x: Math.floor(at.x / T), y: Math.floor((at.fy - 1) / T), face: 'down' };
+    } else {
+      state.mapId = MAPS.farm ? 'farm' : state.mapId;
+      arrival = null;
+    }
+    bus.emit(EV.farmChanged);
+    this.cameras.main.fadeOut(FADE_OUT_MS, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart());
+  }
+
+  private onLost(why: string): void {
+    dialog({
+      pages: [`${why} Back to your own farm.`],
+      onClose: () => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('room');
+        window.location.replace(url.toString());
+      },
+    });
+  }
+
+  /** Guests: lie down and wait for the host to end the day. */
+  private waitInBed(): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    this.waitingInBed = true;
+    this.tools.enabled = false;
+    this.fishing.cancel();
+    audio.playSfx('sleep', 0.8);
+    coop.inBed();
+    this.cameras.main.fadeOut(SLEEP_FADE_MS, 0, 0, 0);
+    bus.emit(EV.notice, `Sleeping... waiting for ${coop.nameOf('h')} to go to bed.`);
+  }
+
+  /** Guests: the host ended the day; wake up at home with everyone. */
+  private wakeWithHost(summary: DaySummary): void {
+    const inBed = this.waitingInBed;
+    this.leaving = true;
+    this.tools.enabled = false;
+    this.fishing.cancel();
+    if (this.player.seated) this.standUp();
+    const wake = () => {
+      audio.endOpening(false);
+      // Up and about when the host collapsed at 2:00 means a rough morning here too.
+      wakeNeeds(state, !inBed && summary.passedOut);
+      const home = MAPS.house;
+      state.mapId = home.id;
+      arrival = { x: home.spawn.x, y: home.spawn.y, face: 'left' };
+      bus.emit(EV.newDay, state.day);
+      bus.emit(EV.needsChanged);
+      bus.emit(EV.farmChanged);
+      bus.once(EV.dayDone, () => this.scene.restart());
+      bus.emit(EV.daySummary, { ...summary, passedOut: !inBed && summary.passedOut });
+    };
+    if (inBed) wake();
+    else {
+      this.cameras.main.fadeOut(SLEEP_FADE_MS, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, wake);
+    }
   }
 
   private onPeriod(): void {
@@ -499,9 +649,12 @@ export class WorldScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     const k = this.keys;
     const active = this.started && !uiState.menuOpen && !this.leaving;
-    if (active) {
+    // In co-op the host keeps the clock running through menus (others are still playing); guests follow the host's clock.
+    if ((active || (coop.isHost && this.started && !this.leaving)) && !coop.isGuest) {
       const ff = k[DEBUG.fastForwardKey].isDown ? TIME.fastForwardMultiplier : 1;
       this.time2.update(delta, ff);
+    }
+    if (active) {
       const dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       const dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
       if (this.player.seated && (dx || dy)) this.standUp();
@@ -535,6 +688,8 @@ export class WorldScene extends Phaser.Scene {
     this.animals.update(delta, this.player.x, this.player.y, this.player.feet());
     this.dog?.update(delta, (x, y) => this.npcs.note(x, y));
     this.fx.update(delta, this.player.x, this.player.y);
+    for (const r of this.remotes.values()) r.update(delta);
+    if (coop.active && !tourView.active) coop.setPose(this.player.pose(this.def.id));
     if (time > this.nextSparkle) {
       this.nextSparkle = time + RIPE_SPARKLE_MS;
       const ripe = this.farm.ripeCells();

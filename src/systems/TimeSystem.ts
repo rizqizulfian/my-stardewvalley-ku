@@ -26,6 +26,13 @@ export class TimeSystem {
     }
   }
 
+  /** Co-op guests: step the clock up to the host's minute instead of keeping time. */
+  follow(minute: number): void {
+    while (this.state.minute < Math.min(minute, TIME.dayEndMinute - 1)) this.advanceMinute();
+    // The host decides when the night ends (2:00 included).
+    this.state.minute = minute;
+  }
+
   private advanceMinute(): void {
     const s = this.state;
     if (s.minute >= TIME.dayEndMinute) return;

@@ -64,6 +64,15 @@ function deliverMail(s: GameState, newSeason: boolean): void {
   }
 }
 
+/** How rested (and how hungry) a night leaves the player. */
+export function wakeNeeds(s: GameState, passedOut: boolean, lateHours = 0): void {
+  const n = s.needs;
+  n.energy = passedOut ? NEEDS.passOutEnergy : Math.round(NEEDS.max - lateHours * NEEDS.lateBedEnergyPerHour);
+  n.sleep = passedOut ? NEEDS.passOutSleep : NEEDS.max;
+  n.hunger = Math.max(10, n.hunger + NEEDS.wakeHunger);
+  n.thirst = Math.max(10, n.thirst + NEEDS.wakeThirst);
+}
+
 export function endDay(s: GameState, passedOut: boolean, rand: () => number = Math.random): DaySummary {
   const ended = { day: s.day, season: s.season };
   const { lines, total } = sellShipped(s);
@@ -79,11 +88,7 @@ export function endDay(s: GameState, passedOut: boolean, rand: () => number = Ma
   const withered = newSeason ? witherOutOfSeason(s) : 0;
   deliverMail(s, newSeason);
 
-  const n = s.needs;
-  n.energy = passedOut ? NEEDS.passOutEnergy : Math.round(NEEDS.max - lateHours * NEEDS.lateBedEnergyPerHour);
-  n.sleep = passedOut ? NEEDS.passOutSleep : NEEDS.max;
-  n.hunger = Math.max(10, n.hunger + NEEDS.wakeHunger);
-  n.thirst = Math.max(10, n.thirst + NEEDS.wakeThirst);
+  wakeNeeds(s, passedOut, lateHours);
   s.minute = TIME.dayStartMinute;
   return { ...ended, sales: lines, total, passedOut, newSeason, withered };
 }

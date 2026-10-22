@@ -5,6 +5,7 @@ import { TOOL_BEHIND, TOOL_FRAME, TOOL_VIEWS, rodTip, toolTexture, type ToolView
 import { PROP_TEXTURES } from '../art/props';
 import type { ToolKind } from '../data/items';
 import type { Box } from '../data/props';
+import type { Pose } from '../net/coop';
 import type { Surface } from '../data/terrain';
 import { worldDepth } from '../systems/MapRenderer';
 import type { WorldMap } from '../systems/WorldMap';
@@ -288,6 +289,23 @@ export class Player {
       this.tool.setPosition(Math.round(this.x), Math.round(this.y));
       this.tool.setDepth(this.sprite.depth + (this.toolBehind ? -0.05 : 0.05));
     }
+  }
+
+  /** How the player looks right now, for the other screens in co-op. */
+  pose(map: string): Pose {
+    const tool = this.tool.visible;
+    return {
+      m: map,
+      x: this.sprite.x,
+      y: this.sprite.y,
+      fy: Math.round(this.y),
+      f: String(this.sprite.frame.name),
+      tk: tool ? this.tool.texture.key : '',
+      tf: tool ? String(this.tool.frame.name) : '',
+      fl: this.tool.flipX,
+      tb: this.toolBehind,
+      sh: this.shadow.visible,
+    };
   }
 
   setVisible(v: boolean): void {
