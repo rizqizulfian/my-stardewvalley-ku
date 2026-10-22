@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTH, PLAYER_ART } from '../config';
+import { DEPTH } from '../config';
 import { TOOL_FRAME } from '../art/items';
 import { PROP_TEXTURES } from '../art/props';
 import type { ColorName } from '../art/palette';
@@ -32,7 +32,7 @@ export class RemotePlayer {
 
   constructor(scene: Phaser.Scene, texture: string, name: string, slot: number) {
     this.shadow = scene.add.image(0, 0, PROP_TEXTURES.shadowS).setAlpha(0.4).setDepth(DEPTH.groundDecor + 0.6);
-    this.sprite = scene.add.sprite(0, 0, texture, 0).setOrigin(0.5, 1).setScale(1 / PLAYER_ART.res);
+    this.sprite = scene.add.sprite(0, 0, texture, 0).setOrigin(0.5, 1);
     this.tool = scene.add.sprite(0, 0, texture, 0).setOrigin(TOOL_FRAME.feetX / TOOL_FRAME.w, TOOL_FRAME.feetY / TOOL_FRAME.h).setVisible(false);
     this.tag = new PixelText(scene, 0, 0, name, { color: TAG_COLORS[slot % TAG_COLORS.length], outline: 'night' }).setDepth(DEPTH.particlesAbove);
     this.setVisible(false);
