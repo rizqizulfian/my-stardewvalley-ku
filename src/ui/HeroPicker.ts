@@ -1,6 +1,6 @@
 // "Choose your farmer": a woman farmer, a man farmer (both named by the
-// player) or Alvira. Shown before the opening story of a new farm, and from
-// Settings to change farmer later. Plain DOM over the canvas like the co-op
+// player), Alvira or the Alvira 2.0 test drawing. Shown before the opening
+// story of a new farm, and from Settings to change farmer later. Plain DOM over the canvas like the co-op
 // panel, since naming needs a real text input (phone keyboards).
 
 import type Phaser from 'phaser';
@@ -19,7 +19,7 @@ const CSS = `
   background: rgba(26, 20, 36, 0.6); font: 13px/1.4 ui-monospace, Menlo, Consolas, 'Courier New', monospace; }
 .lp-hero.lp-open { display: flex; }
 .lp-hero * { box-sizing: border-box; }
-.lp-hero .lp-box { width: min(380px, calc(100vw - 24px)); max-height: calc(100dvh - 16px); overflow: auto;
+.lp-hero .lp-box { width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 16px); overflow: auto;
   background: ${P.cream}; color: ${P.night}; border: 3px solid ${P.night}; border-radius: 4px;
   box-shadow: 0 5px 0 ${P.night}, inset -3px -3px 0 ${P.mist}; padding: 12px; }
 .lp-hero h2 { margin: 0 0 8px; font-size: 15px; color: ${P.brick}; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
@@ -46,6 +46,7 @@ const NOTES: Record<HeroId, string> = {
   'farmer-f': 'Petani baru di Lembah Padi. Beri dia nama.',
   'farmer-m': 'Petani baru di Lembah Padi. Beri dia nama.',
   alvira: 'Alvira, cucu Nek Lastri. Namanya tetap Alvira.',
+  alvira2: 'Gambar Alvira yang baru, untuk dicoba. Baru ada pose depan.',
 };
 
 export interface HeroChoice {
