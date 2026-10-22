@@ -15,8 +15,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Drawn above game resolution and scaled down, so smooth it instead of picking nearest pixels.
-    this.textures.get(PLAYER_CHARACTER.texture).setFilter(Phaser.Textures.FilterMode.LINEAR);
     const t0 = performance.now();
     registerAllArt(new PhaserTextureSink(this.textures));
     console.info(`[boot] art generated in ${Math.round(performance.now() - t0)} ms`);
