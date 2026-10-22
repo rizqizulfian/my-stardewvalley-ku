@@ -31,6 +31,8 @@ export type Role = 'solo' | 'host' | 'guest';
 export interface Pose {
   /** Map id. */
   m: string;
+  /** Body texture: which farmer they chose. */
+  b?: string;
   /** Sprite position (px) and the feet y used for depth sorting. */
   x: number;
   y: number;

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEBUG, NEEDS, PLAYER, RENDER, TIME } from '../config';
 import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
-import { PLAYER_CHARACTER } from '../data/characters';
+import { heroDef } from '../data/heroes';
 import type { Facing } from '../art/characters';
 import { FX_TEXTURES, EMOTE } from '../art/fx';
 import { letter } from '../data/mail';
@@ -128,7 +128,7 @@ export class WorldScene extends Phaser.Scene {
     arrival = null;
     const sx = spot.x * T + T / 2;
     const sy = (spot.y + 1) * T - 2;
-    this.player = new Player(this, this.map, PLAYER_CHARACTER.texture, sx, sy);
+    this.player = new Player(this, this.map, heroDef(state.hero).texture, sx, sy);
     this.player.facing = spot.face;
     this.player.onFootstep = (surface) => audio.footstep(surface);
     if (tourView.active) this.player.setVisible(false);
@@ -231,6 +231,8 @@ export class WorldScene extends Phaser.Scene {
     bus.on(EV.farmChanged, onFarm);
     bus.on(EV.passOut, onPassOut);
     bus.on(EV.minute, onMinute);
+    const onHero = () => this.player.setBody(heroDef(state.hero).texture);
+    bus.on(EV.heroChanged, onHero);
     bus.on(NET.pose, this.onRemotePose, this);
     bus.on(NET.changed, this.onRoster, this);
     bus.on(NET.touched, this.onTouched, this);
@@ -243,6 +245,7 @@ export class WorldScene extends Phaser.Scene {
       bus.off(EV.farmChanged, onFarm);
       bus.off(EV.passOut, onPassOut);
       bus.off(EV.minute, onMinute);
+      bus.off(EV.heroChanged, onHero);
       bus.off(NET.pose, this.onRemotePose, this);
       bus.off(NET.changed, this.onRoster, this);
       bus.off(NET.touched, this.onTouched, this);
@@ -542,7 +545,7 @@ export class WorldScene extends Phaser.Scene {
     if (!r) {
       const info = coop.players.find((x) => x.id === id);
       if (!info) return;
-      r = new RemotePlayer(this, PLAYER_CHARACTER.texture, info.name, info.slot);
+      r = new RemotePlayer(this, p.b && this.textures.exists(p.b) ? p.b : heroDef('alvira').texture, info.name, info.slot);
       this.remotes.set(id, r);
     }
     const here = p.m === this.def.id;

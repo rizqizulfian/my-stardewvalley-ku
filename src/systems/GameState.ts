@@ -3,6 +3,7 @@
 
 import { FARM, NEEDS, TIME } from '../config';
 import { STARTING_ITEMS } from '../data/items';
+import { DEFAULT_HERO, heroDef, type HeroId } from '../data/heroes';
 import { START_MAP } from '../data/maps';
 
 export interface ItemStack {
@@ -71,6 +72,9 @@ export interface GameState {
   animals: Record<string, { petted: number; gave: number }>;
   /** The opening story has been shown. */
   introSeen: boolean;
+  /** Which farmer the player is, and their name (Alvira's is fixed). */
+  hero: HeroId;
+  name: string;
 }
 
 export type Weather = 'sun' | 'rain' | 'storm' | 'snow';
@@ -131,6 +135,8 @@ export function newGameState(): GameState {
     fishCaught: 0,
     animals: {},
     introSeen: false,
+    hero: DEFAULT_HERO,
+    name: heroDef(DEFAULT_HERO).defaultName,
   };
 }
 

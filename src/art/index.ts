@@ -2,7 +2,7 @@
 // with an atlas loader that registers the same keys) to move to PNG art.
 
 import { PLAYER } from '../config';
-import { CHARACTERS } from '../data/characters';
+import { HEROES } from '../data/heroes';
 import { CHAR_FRAMES, buildCharacterFrames } from './characters';
 import { registerBuildings } from './buildings';
 import { registerExtras } from './extras';
@@ -21,8 +21,8 @@ export function registerAllArt(sink: TextureSink): void {
   registerBuildings(sink);
   registerFx(sink);
   registerItemArt(sink);
-  for (const c of CHARACTERS) {
-    sink.sheet(c.texture, buildCharacterFrames(c.look), PLAYER.frameWidth, PLAYER.frameHeight, CHAR_FRAMES.perFacing);
+  for (const h of HEROES) {
+    if (h.look) sink.sheet(h.texture, buildCharacterFrames(h.look), PLAYER.frameWidth, PLAYER.frameHeight, CHAR_FRAMES.perFacing);
   }
   registerNpcArt(sink);
   registerExtras(sink);

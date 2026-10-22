@@ -45,7 +45,7 @@ export const PLAYER = {
   idleFrameMs: 650,
 } as const;
 
-/** Alvira, the player, is a PNG sheet at game resolution (public/sprites/alvira.png, built by tools/build_alvira.py). */
+/** Alvira is a PNG sheet at game resolution (public/sprites/alvira.png, built by tools/build_alvira.py). */
 export const PLAYER_ART = {
   url: 'sprites/alvira.png',
   frameWidth: 18,

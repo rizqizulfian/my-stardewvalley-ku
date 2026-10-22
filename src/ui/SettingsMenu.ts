@@ -38,7 +38,7 @@ type RowKind =
   | { kind: 'volume'; bus: Bus; label: string }
   | { kind: 'mute' }
   | { kind: 'zoom'; label: string }
-  | { kind: 'action'; id: 'coop' | 'save' | 'new' | 'close'; label: string };
+  | { kind: 'action'; id: 'hero' | 'coop' | 'save' | 'new' | 'close'; label: string };
 
 const ROWS: RowKind[] = [
   { kind: 'volume', bus: 'music', label: 'Music' },
@@ -46,6 +46,7 @@ const ROWS: RowKind[] = [
   { kind: 'volume', bus: 'sfx', label: 'Sound effects' },
   { kind: 'mute' },
   { kind: 'zoom', label: 'Zoom' },
+  { kind: 'action', id: 'hero', label: 'Your farmer' },
   { kind: 'action', id: 'coop', label: 'Play together (co-op)' },
   { kind: 'action', id: 'save', label: 'Save now' },
   { kind: 'action', id: 'new', label: 'Start a new farm' },
@@ -68,6 +69,8 @@ export class SettingsMenu {
   onNewFarm: () => void = () => undefined;
   /** Opens the co-op room panel. */
   onCoop: () => void = () => undefined;
+  /** Opens the farmer picker. */
+  onHero: () => void = () => undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -165,6 +168,10 @@ export class SettingsMenu {
     if (r.kind === 'mute') {
       audio.toggleMute();
       audio.playSfx('uiClick', 0.8);
+    } else if (r.id === 'hero') {
+      this.close();
+      this.onHero();
+      return;
     } else if (r.id === 'coop') {
       this.close();
       this.onCoop();
@@ -229,6 +236,7 @@ export class SettingsMenu {
           this.bars.fillStyle(hex(k <= zoomLevel() ? 'sky' : 'cream')).fillRect(x + 1, y + 4, LAYOUT.barStep - 4, 5);
         }
       } else if (r.kind === 'mute') this.values[i].setText(audio.settings.muted ? 'On' : 'Off');
+      else if (r.id === 'hero') this.values[i].setText(this.state.name);
       else if (r.id === 'new') {
         const confirming = this.scene.time.now < this.confirmUntil;
         this.labels[i].setText(confirming ? 'Press again: erase this farm!' : r.label).setStyle({ color: confirming ? 'brick' : 'night' });

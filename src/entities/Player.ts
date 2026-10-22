@@ -296,6 +296,7 @@ export class Player {
     const tool = this.tool.visible;
     return {
       m: map,
+      b: this.sprite.texture.key,
       x: this.sprite.x,
       y: this.sprite.y,
       fy: Math.round(this.y),
@@ -306,6 +307,11 @@ export class Player {
       tb: this.toolBehind,
       sh: this.shadow.visible,
     };
+  }
+
+  /** Another body (the farmer was changed in Settings), keeping the current frame. */
+  setBody(texture: string): void {
+    this.sprite.setTexture(texture, this.sprite.frame.name);
   }
 
   setVisible(v: boolean): void {

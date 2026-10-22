@@ -9,6 +9,8 @@ export const EV = {
   periodChanged: 'time:period',
   goldChanged: 'gold:changed',
   started: 'game:started',
+  /** The player picked another farmer (Settings). */
+  heroChanged: 'game:hero-changed',
   /** Inventory contents or selection changed. */
   inventoryChanged: 'inv:changed',
   /** (id, qty) an item entered the backpack. */

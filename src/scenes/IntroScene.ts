@@ -3,7 +3,7 @@
 // typewriter narration under it. Any key or click moves on; Esc skips.
 
 import Phaser from 'phaser';
-import { PLAYER_CHARACTER } from '../data/characters';
+import { fillName, heroDef } from '../data/heroes';
 import { INTRO_SHOTS, type IntroShot } from '../data/intro';
 import { CHAR_FRAMES, charFrame } from '../art/characters';
 import { wrapText } from '../art/font';
@@ -15,6 +15,7 @@ import { audio } from '../audio/AudioManager';
 import { hash2 } from '../art/pixel';
 import { addPanel } from '../ui/Panel';
 import { PixelText } from '../ui/PixelText';
+import { state } from '../systems/GameState';
 
 const LAYOUT = {
   gap: 6,
@@ -156,7 +157,7 @@ export class IntroScene extends Phaser.Scene {
   }
 
   private startLine(): void {
-    this.full = this.current.lines[this.line];
+    this.full = fillName(this.current.lines[this.line], state.name);
     this.wrapped = wrapText(this.full, INTRO.w - LAYOUT.pad * 2 - 8);
     this.shown = 0;
     this.readyAt = this.time.now + TIMING.settleMs;
@@ -272,7 +273,7 @@ export class IntroScene extends Phaser.Scene {
         const rain = img(INTRO_TEXTURES.rain, OFFICE.window.x, OFFICE.window.y, 0).setAlpha(0.8);
         const glow = add(this.add.image(OFFICE.monitor.x, OFFICE.monitor.y + 4, INTRO_TEXTURES.glow).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.3));
         const you = add(
-          this.add.sprite(OFFICE.seat.x, OFFICE.seat.y, PLAYER_CHARACTER.texture, charFrame('up', CHAR_FRAMES.sit)).setOrigin(0.5, 1),
+          this.add.sprite(OFFICE.seat.x, OFFICE.seat.y, heroDef(state.hero).texture, charFrame('up', CHAR_FRAMES.sit)).setOrigin(0.5, 1),
         );
         // A tube light that cannot make up its mind.
         const tube = add(this.add.rectangle(246, 4, 36, 1, hex('mist')).setOrigin(0, 0));
@@ -360,7 +361,7 @@ export class IntroScene extends Phaser.Scene {
           const o = add(this.add.image(x, y, key, frame).setOrigin(0, 0));
           o.setDepth(y + o.height);
         }
-        const you = add(this.add.sprite(160, INTRO.h + 20, PLAYER_CHARACTER.texture, charFrame('up', 0)).setOrigin(0.5, 1));
+        const you = add(this.add.sprite(160, INTRO.h + 20, heroDef(state.hero).texture, charFrame('up', 0)).setOrigin(0.5, 1));
         this.stage.sort('depth');
         this.stage.bringToTop(you);
         const stopY = 118;
