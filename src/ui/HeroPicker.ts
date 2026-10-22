@@ -46,7 +46,7 @@ const NOTES: Record<HeroId, string> = {
   'farmer-f': 'Petani baru di Lembah Padi. Beri dia nama.',
   'farmer-m': 'Petani baru di Lembah Padi. Beri dia nama.',
   alvira: 'Alvira, cucu Nek Lastri. Namanya tetap Alvira.',
-  alvira2: 'Gambar Alvira yang baru, untuk dicoba. Baru ada pose depan.',
+  alvira2: 'Gambar Alvira yang baru, untuk dicoba. Jalannya belum punya gambar sendiri.',
 };
 
 export interface HeroChoice {
