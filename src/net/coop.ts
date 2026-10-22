@@ -20,7 +20,8 @@ export const COOP = {
   /** A still player is re-sent this often, so late joiners see them. */
   poseIdleMs: 1000,
   syncMs: 200,
-  connectTimeoutMs: 15000,
+  /** Relayed (TURN) connections can take a while to set up on mobile networks. */
+  connectTimeoutMs: 30000,
   nameMax: 12,
 } as const;
 
@@ -95,11 +96,26 @@ export function cleanCode(raw: string): string {
 }
 
 /** `?peer=localhost:9000` points at a self-run PeerJS server (handy for testing offline). */
+/**
+ * How the two browsers find a path to each other. STUN works when both are on
+ * ordinary home networks; mobile data and strict Wi-Fi need a TURN relay that
+ * passes the (tiny) game traffic along. These are free public ones, tried in
+ * turn; the TLS ones on 443/5349 get through most firewalls.
+ */
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+  { urls: ['stun:freestun.net:3478'] },
+  { urls: ['turn:freestun.net:3478', 'turns:freestun.net:5349'], username: 'free', credential: 'free' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443'], username: 'openrelayproject', credential: 'openrelayproject' },
+];
+
 function peerOptions(): PeerOptions {
+  const config = { iceServers: ICE_SERVERS };
   const q = new URLSearchParams(window.location.search).get('peer');
-  if (!q) return { debug: 1 };
+  if (!q) return { debug: 1, config };
   const [host, port] = q.split(':');
-  return { host, port: Number(port) || 9000, path: '/', secure: false, debug: 1 };
+  return { host, port: Number(port) || 9000, path: '/', secure: false, debug: 1, config };
 }
 
 class Coop {
@@ -213,7 +229,9 @@ class Coop {
       };
       const peer = new Peer(peerOptions());
       this.peer = peer;
-      const timer = window.setTimeout(() => fail('No answer from that room. Check the code, or try another network.'), COOP.connectTimeoutMs);
+      // How far it got decides what to tell the player when it gives up.
+      let stage: 'service' | 'host' | 'link' | 'welcome' = 'service';
+      const timer = window.setTimeout(() => fail(STUCK[stage]), COOP.connectTimeoutMs);
       peer.on('error', (e) => {
         if (!settled) {
           window.clearTimeout(timer);
@@ -221,9 +239,20 @@ class Coop {
         }
       });
       peer.on('open', () => {
+        stage = 'host';
         const c = peer.connect(COOP.idPrefix + code, { reliable: true, serialization: 'json' });
         this.conns.set('h', c);
-        c.on('open', () => c.send({ t: 'hello', name } satisfies Msg));
+        c.on('open', () => {
+          stage = 'welcome';
+          c.send({ t: 'hello', name } satisfies Msg);
+        });
+        c.on('iceStateChanged', (ice) => {
+          if (ice === 'checking' && stage === 'host') stage = 'link';
+          if (ice === 'failed' && !settled) {
+            window.clearTimeout(timer);
+            fail(STUCK.link);
+          }
+        });
         c.on('data', (raw) => {
           const msg = raw as Msg;
           if (msg.t === 'full') {
@@ -434,6 +463,14 @@ class Coop {
 export function cleanName(raw: string): string {
   return raw.replace(/[^\w .'-]/g, '').trim().slice(0, COOP.nameMax);
 }
+
+/** Why a join gave up, by how far it got. */
+const STUCK = {
+  service: 'Could not reach the co-op service. Check your internet and try again.',
+  host: 'The room did not answer. Is the host\'s game still open in front (not in the background)? Check the code too.',
+  link: 'Found the room, but your networks would not let the two games connect. Try other Wi-Fi or mobile data on one side.',
+  welcome: 'Connected, but the host\'s game did not reply. Ask the host to bring the game tab to the front and try again.',
+} as const;
 
 function errorText(type: string): string {
   switch (type) {

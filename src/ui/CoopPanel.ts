@@ -105,7 +105,7 @@ function render(): void {
       <label>On the farm (${coop.players.length}/${COOP.maxPlayers})</label>
       ${playerList()}
       ${status}
-      <p class="lp-note">Keep this tab open: the farm lives in your game. It saves when you sleep.</p>
+      <p class="lp-note">Keep this game open and in front while friends play: the farm lives in your game, and phones pause tabs left in the background (send the link, then come straight back). It saves when you sleep.</p>
       <button data-act="close" class="lp-quiet">Back to the game</button>
       <button data-act="leave" class="lp-warn">Close the room</button>`;
     return;
