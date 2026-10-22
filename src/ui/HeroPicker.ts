@@ -7,12 +7,12 @@ import type Phaser from 'phaser';
 import { CHAR_FRAMES, charFrame } from '../art/characters';
 import { PALETTE } from '../art/palette';
 import { audio } from '../audio/AudioManager';
-import { HEROES, NAME_MAX, cleanHeroName, heroDef, type HeroId } from '../data/heroes';
+import { HEROES, NAME_MAX, cleanHeroName, heroDef, heroScale, type HeroId } from '../data/heroes';
 import { PLAYER } from '../config';
 
 const P = PALETTE;
-/** Preview canvas in game pixels (fits the 18x30 Alvira frame), drawn SCALE times larger. */
-const PREVIEW = { w: 20, h: 31, scale: 3 } as const;
+/** Preview canvas in game pixels (fits the 18x30 Alvira frame) with RES pixels each, shown SCALE times larger. */
+const PREVIEW = { w: 20, h: 31, scale: 3, res: 2 } as const;
 
 const CSS = `
 .lp-hero { position: fixed; inset: 0; z-index: 2100; display: none; align-items: center; justify-content: center;
@@ -46,7 +46,7 @@ const NOTES: Record<HeroId, string> = {
   'farmer-f': 'Petani baru di Lembah Padi. Beri dia nama.',
   'farmer-m': 'Petani baru di Lembah Padi. Beri dia nama.',
   alvira: 'Alvira, cucu Nek Lastri. Namanya tetap Alvira.',
-  alvira2: 'Gambar Alvira yang baru, untuk dicoba. Jalannya belum punya gambar sendiri.',
+  alvira2: 'Gambar Alvira yang baru, untuk dicoba, dengan detail lebih halus.',
 };
 
 export interface HeroChoice {
@@ -114,7 +114,7 @@ function render(): void {
     <div class="lp-box">
       <h2>Pilih petanimu</h2>
       <div class="lp-cards">
-        ${HEROES.map((h) => `<button class="lp-card${h.id === picked ? ' lp-on' : ''}" data-hero="${h.id}"><canvas width="${PREVIEW.w}" height="${PREVIEW.h}"></canvas>${h.label}</button>`).join('')}
+        ${HEROES.map((h) => `<button class="lp-card${h.id === picked ? ' lp-on' : ''}" data-hero="${h.id}"><canvas width="${PREVIEW.w * PREVIEW.res}" height="${PREVIEW.h * PREVIEW.res}"></canvas>${h.label}</button>`).join('')}
       </div>
       <div class="lp-name-row" ${def.namable ? '' : 'hidden'}>
         <label for="lp-hero-name">Nama</label>
@@ -137,8 +137,13 @@ function draw(): void {
     const ctx = cv.getContext('2d');
     if (!ctx || !open!.textures.exists(h.texture)) return;
     const f = open!.textures.getFrame(h.texture, h.id === picked ? frame : CHAR_FRAMES.idle[0]);
+    // The canvas holds PREVIEW.res pixels per game pixel, so drawn sheets keep their detail.
+    const k = PREVIEW.res * heroScale(h.texture);
+    const w = f.cutWidth * k;
+    const hh = f.cutHeight * k;
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, cv.width, cv.height);
-    ctx.drawImage(f.source.image as CanvasImageSource, f.cutX, f.cutY, f.cutWidth, f.cutHeight, Math.floor((cv.width - f.cutWidth) / 2), cv.height - f.cutHeight, f.cutWidth, f.cutHeight);
+    ctx.drawImage(f.source.image as CanvasImageSource, f.cutX, f.cutY, f.cutWidth, f.cutHeight, Math.floor((cv.width - w) / 2), cv.height - hh, w, hh);
   });
 }
 
