@@ -4,15 +4,17 @@
 
 import type { CharacterLook } from '../art/characters';
 
-export type HeroId = 'farmer-f' | 'farmer-m' | 'alvira';
+export type HeroId = 'farmer-f' | 'farmer-m' | 'alvira' | 'alvira2';
 
 export interface HeroDef {
   id: HeroId;
   /** Shown on the picker card. */
   label: string;
   texture: string;
-  /** Code-drawn farmers only; Alvira's sheet is a PNG loaded by BootScene. */
+  /** Code-drawn farmers only. */
   look?: CharacterLook;
+  /** PNG sheet (in public/, PLAYER_ART frame size) loaded by BootScene, for drawn farmers. */
+  sheet?: string;
   /** Generic farmers take the player's own name; this is the suggestion. */
   defaultName: string;
   namable: boolean;
@@ -54,7 +56,9 @@ export const HEROES: HeroDef[] = [
       hat: { style: 'caping', ramp: ['clay', 'amber', 'gold', 'cream'] },
     },
   },
-  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', defaultName: 'Alvira', namable: false },
+  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: 'sprites/alvira.png', defaultName: 'Alvira', namable: false },
+  // For testing Zulfian's new drawing (tools/build_alvira2.py); she is still Alvira in the story.
+  { id: 'alvira2', label: 'Alvira 2.0 Testing', texture: 'char-alvira2', sheet: 'sprites/alvira2.png', defaultName: 'Alvira', namable: false },
 ];
 
 export const DEFAULT_HERO: HeroId = 'alvira';
