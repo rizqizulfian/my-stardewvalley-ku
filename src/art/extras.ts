@@ -4,6 +4,7 @@
 import { PixelGrid, blobMask, hash2, outline, shade, type ShadeOptions, type TextureSink } from './pixel';
 import { RAMPS, type ColorName, type Ramp } from './palette';
 import { textGrid } from './font';
+import { VAN_GOGH, VAN_GOGH_CELL, vanGoghBanner, vanGoghPainting } from './vangogh';
 
 export const EXTRA_TEXTURES = {
   dog: 'extra-dog',
@@ -15,6 +16,8 @@ export const EXTRA_TEXTURES = {
   museumLit: 'extra-museum-lit',
   bigFountain: 'extra-big-fountain',
   painting: 'extra-painting',
+  vanGogh: 'extra-van-gogh',
+  vanGoghBanner: 'extra-van-gogh-banner',
   sculpture: 'extra-sculpture',
   ropePost: 'extra-rope-post',
   hedge: 'extra-hedge',
@@ -484,6 +487,8 @@ export function registerExtras(sink: TextureSink): void {
   sink.image(EXTRA_TEXTURES.museum, mu);
   sink.image(EXTRA_TEXTURES.museumLit, muLit);
   sink.sheet(EXTRA_TEXTURES.painting, PAINTINGS.map(painting), 30, 22);
+  sink.sheet(EXTRA_TEXTURES.vanGogh, VAN_GOGH.map(vanGoghPainting), VAN_GOGH_CELL.w, VAN_GOGH_CELL.h);
+  sink.image(EXTRA_TEXTURES.vanGoghBanner, vanGoghBanner());
   sink.sheet(EXTRA_TEXTURES.sculpture, SCULPTURES.map(sculpture), 18, 34);
   sink.image(EXTRA_TEXTURES.ropePost, ropePost());
   sink.sheet(EXTRA_TEXTURES.bigFountain, bigFountain(), BIG_FOUNTAIN.w, BIG_FOUNTAIN.h);

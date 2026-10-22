@@ -1,5 +1,5 @@
-// The museum's collection: what each plaque says. Artists are villagers of
-// the valley (all made up).
+// The museum's collection: what each plaque says. Most artists are villagers
+// of the valley (all made up); the east room holds copies of Van Gogh.
 
 export interface Artwork {
   title: string;
@@ -20,4 +20,11 @@ export const ARTWORKS: Record<string, Artwork> = {
   bust: { title: 'Kepala Desa Pertama', artist: 'unknown, carved stone', text: 'The first head of the village, carved about a hundred years ago. Pak Harun swears it looks like him.' },
   farmer: { title: 'Petani', artist: 'Joko Santoso, bronze', text: 'A farmer in a caping hat with a hoe on the shoulder. Polished bright where children touch the hat for luck.' },
   egg: { title: 'Telur Langit', artist: 'Ayu Lestari, glazed clay', text: 'A sky-blue egg as tall as a child. Nobody knows what will hatch from it.' },
+  // The Van Gogh room. Copies of real paintings, all public domain.
+  selfportrait: { title: 'Self-Portrait (1889)', artist: 'Vincent van Gogh, oil on canvas', text: 'Painted in Saint-Remy in September 1889, in his blue suit against a sea of swirls. He painted more than 35 self-portraits, often because he could not pay a model.' },
+  starrynight: { title: 'The Starry Night (1889)', artist: 'Vincent van Gogh, oil on canvas', text: 'The view from his window at the asylum in Saint-Remy, before sunrise, with an imagined village and a cypress like a dark flame. The original hangs in New York.' },
+  sunflowers: { title: 'Sunflowers (1888)', artist: 'Vincent van Gogh, oil on canvas', text: 'Painted in Arles to brighten the room of his friend Gauguin. Some flowers are in full bloom, some already gone to seed. He signed it on the vase: Vincent.' },
+  bedroom: { title: 'The Bedroom (1888)', artist: 'Vincent van Gogh, oil on canvas', text: 'His own room in the Yellow House in Arles. He wrote to his brother Theo that just looking at it should rest the mind. He liked it so much he painted it three times.' },
+  cafe: { title: 'Cafe Terrace at Night (1888)', artist: 'Vincent van Gogh, oil on canvas', text: 'A cafe on the Place du Forum in Arles under a starry sky, painted on the spot at night. His first painting of a starry sky, and there is no black in it at all.' },
+  wheatfield: { title: 'Wheat Field with Cypresses (1889)', artist: 'Vincent van Gogh, oil on canvas', text: 'Ripe wheat, olive bushes, violet hills and two cypresses near Saint-Remy, in the summer wind. Ask any farmer here: that is what July looks like.' },
 };

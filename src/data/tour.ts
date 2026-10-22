@@ -58,7 +58,7 @@ export const TOUR_STOPS: TourStop[] = [
   {
     map: 'museum',
     title: 'Museum Seni',
-    caption: 'Lukisan karya seniman lembah. Baca plakat di bawah tiap lukisan.',
+    caption: 'Lukisan seniman lembah dan ruang Van Gogh. Baca plakat di bawah tiap lukisan.',
     from: { x: 13, y: 6 },
     to: { x: 13, y: 6 },
   },
