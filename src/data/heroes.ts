@@ -64,7 +64,7 @@ export const HEROES: HeroDef[] = [
     id: 'alvira2',
     label: 'Alvira 2.0 Testing',
     texture: 'char-alvira2',
-    sheet: { url: 'sprites/alvira2.png', frameWidth: 26, frameHeight: 44, res: 1 },
+    sheet: { url: 'sprites/alvira2.png', frameWidth: 22, frameHeight: 36, res: 1 },
     defaultName: 'Alvira',
     namable: false,
   },

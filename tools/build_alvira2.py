@@ -10,8 +10,8 @@ villagers: STAND_H game pixels tall in a CELL_W x CELL_H cell, one sheet pixel
 per game pixel. Standing frames are scaled to one height and walk frames a
 little lower (mid-step), anchored at the feet, given a dark outline, and her
 skin is pulled to the drawing's light tone (the shrink darkens it next to the
-outline). Side walks alternate stride and passing frames and bob up on the
-passing ones, so she steps instead of gliding.
+outline). Side walks alternate strides with the standing pose and bob up on
+it, so her legs visibly move instead of gliding.
 The layout matches CHAR_FRAMES in src/art/characters.ts.
 """
 import os
@@ -19,21 +19,22 @@ import sys
 
 from PIL import Image, ImageEnhance, ImageFilter
 
-CELL_W, CELL_H = 26, 44  # must match HeroDef.sheet in src/data/heroes.ts
-STAND_H = 40
+CELL_W, CELL_H = 22, 36  # must match HeroDef.sheet in src/data/heroes.ts
+STAND_H = 32
 STEP = 0.95
 OUTLINE = (34, 22, 30, 255)
 SKIN = (255, 220, 170)
 
 # Which source frame is which: standing, then walk steps, per facing (as seen on screen).
 STAND = {'down': 5, 'up': 6, 'left': 8, 'right': 7}
-# Walk cycle per facing: (source frame, pixels lifted). Front and back play the four steps as drawn;
-# the side steps 1-3 are all long strides, so they alternate with the passing pose (4) lifted.
+# Walk cycle per facing: (source frame, pixels lifted). Front and back play the four steps as drawn.
+# All four side drawings are strides with the feet apart (played in a row she glides), so the side
+# walk alternates two strides with the standing pose (None) as the passing step, lifted a pixel.
 WALK = {
     'down': [(10, 0), (17, 0), (22, 0), (28, 0)],
     'up': [(11, 0), (16, 0), (23, 0), (29, 0)],
-    'left': [(13, 0), (31, 1), (25, 0), (31, 1)],
-    'right': [(12, 0), (30, 1), (24, 0), (30, 1)],
+    'left': [(13, 0), (None, 1), (25, 0), (None, 1)],
+    'right': [(12, 0), (None, 1), (24, 0), (None, 1)],
 }
 FACINGS = ['down', 'up', 'right', 'left']
 
@@ -107,14 +108,17 @@ def main(src, out):
         s = STAND_H / raw.height
         stand = scaled(raw, s)
         # Walk frames were drawn at other sizes: mid-step she is a little lower than standing.
-        walk = [scaled(w, STAND_H * STEP / w.height) for w in (load(src, n) for n, _ in WALK[facing])]
+        walk = []
+        for n, _ in WALK[facing]:
+            w = None if n is None else load(src, n)
+            walk.append(stand if w is None else scaled(w, STAND_H * STEP / w.height))
         lifts = [lift for _, lift in WALK[facing]]
         rows.append([
             cell(stand), cell(stand, lift=1),  # idle: a small breath
             *(cell(w, lift) for w, lift in zip(walk, lifts)),
             cell(walk[0]), cell(walk[2]),  # tool use: wind-up, strike
             cell(stand.crop((0, 0, stand.width, int(stand.height * 0.8)))),  # sitting: the seat hides the legs
-            cell(stand), cell(walk[1], lift=2), cell(stand), cell(walk[3], lift=2),  # dance: hop
+            cell(stand), cell(walk[0], lift=2), cell(stand), cell(walk[2], lift=2),  # dance: hop
         ])
     sheet = Image.new('RGBA', (CELL_W * len(rows[0]), CELL_H * len(rows)))
     for y, r in enumerate(rows):
