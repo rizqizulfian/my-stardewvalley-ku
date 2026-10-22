@@ -12,7 +12,7 @@ export interface CharacterDef {
 
 export const PLAYER_CHARACTER: CharacterDef = {
   id: 'player',
-  name: 'You',
+  name: 'Alvira',
   texture: 'char-player',
   look: {
     hair: ['bark', 'umber', 'clay'],
@@ -26,5 +26,5 @@ export const PLAYER_CHARACTER: CharacterDef = {
   },
 };
 
-/** Everyone whose sprite sheet is generated at boot. NPCs join this list later. */
-export const CHARACTERS: CharacterDef[] = [PLAYER_CHARACTER];
+/** Everyone whose sprite sheet is generated at boot. The player is not here: Alvira's sheet is a PNG loaded by BootScene. */
+export const CHARACTERS: CharacterDef[] = [];

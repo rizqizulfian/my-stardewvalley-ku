@@ -81,7 +81,7 @@ export const NPCS: NpcDef[] = [
     ],
     shop: 'warung',
     intro: [
-      'Eh, wajah baru! Kamu yang meneruskan kebun almarhumah Nek Lastri, ya? Saya Sari, yang punya warung ini.',
+      'Eh, wajah baru! Kamu Alvira, cucu almarhumah Nek Lastri yang meneruskan kebunnya, ya? Saya Sari, yang punya warung ini.',
       'Kalau lapar atau haus, mampir saja. Nasi goreng saya paling enak se-lembah. Katanya sih, hehe.',
     ],
     lines: [
