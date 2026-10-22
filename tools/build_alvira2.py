@@ -1,103 +1,85 @@
-"""Build public/sprites/alvira2.png ("Alvira 2.0 Testing") from Zulfian's sheet.
+"""Build public/sprites/alvira2.png ("Alvira 2.0 Testing") from Zulfian's frames.
 
-Usage: python3 tools/build_alvira2.py tools/src/alvira2-sheet.png public/sprites/alvira2.png
+Usage: python3 tools/build_alvira2.py tools/src/alvira2 public/sprites/alvira2.png
 
-The source (spritesheet 3.png) holds a single front-facing standing pose on a
-magenta key. It is keyed out, shrunk to villager height in an 18x30 cell and
-cut to hard pixels with a dark outline. Every other pose is made from that one
-drawing: walks lift one boot at a time, the back view paints hair over the
-face, the side views are the front pose (there are no side drawings yet).
+The frames (97x206, from "sprites alvira 2.0.zip") are a standing pose and four
+walk steps for each facing. To keep the details of the drawing (sunglasses,
+flower clip, necklace, belt, studs, watch, bag, boots) she is built at RES
+times the game's pixel size and drawn at 1 / RES in game (HeroDef.sheet.res),
+with nearest filtering so it stays crisp. Standing frames are scaled to one height and
+walk frames a little lower (mid-step), anchored at the feet, given a dark outline, and her skin is pulled to
+the drawing's light tone (the shrink darkens it next to the outline).
 The layout matches CHAR_FRAMES in src/art/characters.ts.
 """
+import os
 import sys
 
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 
-CELL_W, CELL_H = 18, 30
-STAND_H = 27
-WIDEN = 1.25  # the source is slimmer than the villagers
-# Sampled from the drawing's face.
-SKIN, SKIN_LIGHT, EYE = (250, 212, 164, 255), (255, 230, 194, 255), (40, 26, 34, 255)
+RES = 2
+CELL_W, CELL_H = 18 * RES, 30 * RES
+STAND_H = 28 * RES
+STEP = 0.95
 OUTLINE = (34, 22, 30, 255)
+SKIN = (255, 220, 170)
+
+# Which source frame is which: standing, then walk steps, per facing (as seen on screen).
+STAND = {'down': 5, 'up': 6, 'left': 8, 'right': 7}
+WALK = {
+    'down': [10, 17, 22, 28],
+    'up': [11, 16, 23, 29],
+    'left': [13, 19, 25, 31],
+    'right': [12, 18, 24, 30],
+}
+FACINGS = ['down', 'up', 'right', 'left']
 
 
-def key(im):
-    """Magenta background -> transparent."""
-    im = im.convert('RGBA')
+def load(d, n):
+    """A frame without its magenta fringe, cropped."""
+    im = Image.open(os.path.join(d, 'frame_%03d.png' % n)).convert('RGBA')
     px = im.load()
     for y in range(im.height):
         for x in range(im.width):
             r, g, b, a = px[x, y]
-            if a == 0 or (r - g > 70 and b - g > 70):
+            if a < 140 or (r - g > 60 and b - g > 60):
                 px[x, y] = (0, 0, 0, 0)
+    return im.crop(im.getbbox())
+
+
+def scaled(im, s):
+    im = im.filter(ImageFilter.UnsharpMask(2, 120, 2))
+    out = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+    alpha = out.getchannel('A').point(lambda a: 255 if a >= 110 else 0)
+    rgb = ImageEnhance.Contrast(ImageEnhance.Color(out.convert('RGB')).enhance(1.15)).enhance(1.05)
+    hard = Image.new('RGBA', out.size)
+    hard.paste(rgb, mask=alpha)
+    return brighten_skin(hard.crop(hard.getbbox()))
+
+
+def is_skin(r, g, b):
+    return r > 140 and g > 90 and r - b > 30 and r >= g >= b - 10
+
+
+def brighten_skin(im):
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a and is_skin(r, g, b):
+                px[x, y] = tuple(round(c + (t - c) * 0.6) for c, t in zip((r, g, b), SKIN)) + (255,)
     return im
 
 
-def poses(im):
-    """Split the sheet at the empty columns between drawings."""
+def head_center(im):
     a = im.getchannel('A')
-    cols = [a.crop((x, 0, x + 1, im.height)).getbbox() is not None for x in range(im.width)]
-    out, start = [], None
-    for x, used in enumerate(cols + [False]):
-        if used and start is None:
-            start = x
-        elif not used and start is not None:
-            if x - start > 20:
-                part = im.crop((start, 0, x, im.height))
-                out.append(part.crop(part.getbbox()))
-            start = None
-    return out
-
-
-def shrink(im, tallest):
-    s = STAND_H / tallest
-    out = im.resize((max(1, round(im.width * s * WIDEN)), max(1, round(im.height * s))), Image.BOX)
-    alpha = out.getchannel('A').point(lambda a: 255 if a >= 120 else 0)
-    rgb = ImageEnhance.Color(out.convert('RGB')).enhance(1.15)
-    hard = Image.new('RGBA', out.size)
-    hard.paste(rgb, mask=alpha)
-    return hard.crop(hard.getbbox())
+    top = a.crop((0, 0, im.width, max(1, im.height // 3))).getbbox()
+    return (top[0] + top[2]) / 2 if top else im.width / 2
 
 
 def cell(im, lift=0):
     c = Image.new('RGBA', (CELL_W, CELL_H))
-    c.alpha_composite(im, ((CELL_W - im.width) // 2, CELL_H - im.height - lift))
+    c.alpha_composite(im, (round(CELL_W / 2 - head_center(im)), CELL_H - im.height - lift))
     return c
-
-
-def step(im, side):
-    """Lift the boot on one side (0 left, 1 right) by a pixel."""
-    out = im.copy()
-    w, h = im.size
-    knee = int(h * 0.8)
-    half = (0, knee, w // 2, h) if side == 0 else (w // 2, knee, w, h)
-    leg = im.crop(half)
-    out.paste(Image.new('RGBA', leg.size), half[:2])
-    out.alpha_composite(leg, (half[0], knee - 1))
-    return out
-
-
-def is_skin(p):
-    r, g, b, a = p
-    return a and r > 150 and r >= g >= b - 12 and r - b > 25
-
-
-def face(im, eyes: str | None = 'both'):
-    """Flat light skin (the drawing's), then dark eyes: at this size they melt into the skin otherwise."""
-    out = im.copy()
-    px = out.load()
-    for y in range(out.height):  # hands too
-        for x in range(out.width):
-            if is_skin(px[x, y]):
-                px[x, y] = SKIN_LIGHT if sum(px[x, y][:3]) > 660 else SKIN
-    skin = [(x, y) for y in range(int(out.height * 0.45)) for x in range(out.width) if px[x, y] in (SKIN, SKIN_LIGHT)]
-    if len(skin) < 4 or eyes is None:
-        return out
-    xs, ys = [x for x, _ in skin], [y for _, y in skin]
-    ey = min(ys) + 2
-    for ex in {'both': (min(xs) + 1, max(xs) - 1), 'right': (max(xs) - 1,), 'left': (min(xs) + 1,)}[eyes]:
-        px[ex, ey] = EYE
-    return out
 
 
 def outline(sheet):
@@ -115,29 +97,27 @@ def outline(sheet):
 
 
 def main(src, out):
-    drawn = poses(key(Image.open(src)))
-    assert len(drawn) == 4, f'expected 4 poses, found {len(drawn)}'
-    tallest = max(d.height for d in drawn)
-    front, rear, right, left = [shrink(d, tallest) for d in drawn]
-    front, rear, right, left = face(front), face(rear, None), face(right, 'right'), face(left, 'left')
-
-    def row(f):
-        return [
-            cell(f), cell(f),
-            cell(step(f, 0)), cell(f, lift=1), cell(step(f, 1)), cell(f, lift=1),
-            cell(f), cell(f, lift=1),
-            cell(f.crop((0, 0, f.width, int(f.height * 0.8)))),
-            cell(f), cell(step(f, 0)), cell(f, lift=1), cell(step(f, 1)),
-        ]
-
-    rows = [row(front), row(rear), row(right), row(left)]
+    rows = []
+    for facing in FACINGS:
+        raw = load(src, STAND[facing])
+        s = STAND_H / raw.height
+        stand = scaled(raw, s)
+        # Walk frames were drawn at other sizes: mid-step she is a little lower than standing.
+        walk = [scaled(w, STAND_H * STEP / w.height) for w in (load(src, n) for n in WALK[facing])]
+        rows.append([
+            cell(stand), cell(stand, lift=RES // 2 or 1),  # idle: a small breath
+            *(cell(w) for w in walk),
+            cell(walk[0]), cell(walk[2]),  # tool use: wind-up, strike
+            cell(stand.crop((0, 0, stand.width, int(stand.height * 0.8)))),  # sitting: the seat hides the legs
+            cell(stand), cell(walk[1], lift=RES), cell(stand), cell(walk[3], lift=RES),  # dance: hop
+        ])
     sheet = Image.new('RGBA', (CELL_W * len(rows[0]), CELL_H * len(rows)))
     for y, r in enumerate(rows):
         for x, c in enumerate(r):
             sheet.alpha_composite(c, (x * CELL_W, y * CELL_H))
     sheet = outline(sheet)
     sheet.save(out, optimize=True)
-    print(out, sheet.size, 'poses', [d.size for d in (front, rear, right, left)])
+    print(out, sheet.size)
 
 
 if __name__ == '__main__':

@@ -11,7 +11,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const h of HEROES) if (h.sheet) this.load.spritesheet(h.texture, h.sheet, { frameWidth: PLAYER_ART.frameWidth, frameHeight: PLAYER_ART.frameHeight });
+    for (const h of HEROES)
+      if (h.sheet) this.load.spritesheet(h.texture, h.sheet.url, { frameWidth: PLAYER_ART.frameWidth * h.sheet.res, frameHeight: PLAYER_ART.frameHeight * h.sheet.res });
   }
 
   create(): void {

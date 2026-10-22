@@ -3,6 +3,7 @@ import { DEPTH } from '../config';
 import { TOOL_FRAME } from '../art/items';
 import { PROP_TEXTURES } from '../art/props';
 import type { ColorName } from '../art/palette';
+import { heroScale } from '../data/heroes';
 import type { Pose } from '../net/coop';
 import { worldDepth } from '../systems/MapRenderer';
 import { PixelText } from '../ui/PixelText';
@@ -32,7 +33,7 @@ export class RemotePlayer {
 
   constructor(scene: Phaser.Scene, texture: string, name: string, slot: number) {
     this.shadow = scene.add.image(0, 0, PROP_TEXTURES.shadowS).setAlpha(0.4).setDepth(DEPTH.groundDecor + 0.6);
-    this.sprite = scene.add.sprite(0, 0, texture, 0).setOrigin(0.5, 1);
+    this.sprite = scene.add.sprite(0, 0, texture, 0).setOrigin(0.5, 1).setScale(heroScale(texture));
     this.tool = scene.add.sprite(0, 0, texture, 0).setOrigin(TOOL_FRAME.feetX / TOOL_FRAME.w, TOOL_FRAME.feetY / TOOL_FRAME.h).setVisible(false);
     this.tag = new PixelText(scene, 0, 0, name, { color: TAG_COLORS[slot % TAG_COLORS.length], outline: 'night' }).setDepth(DEPTH.particlesAbove);
     this.setVisible(false);
@@ -46,7 +47,7 @@ export class RemotePlayer {
       this.x = p.x;
       this.y = p.y;
     }
-    if (p.b && p.b !== this.sprite.texture.key && this.sprite.scene.textures.exists(p.b)) this.sprite.setTexture(p.b, p.f);
+    if (p.b && p.b !== this.sprite.texture.key && this.sprite.scene.textures.exists(p.b)) this.sprite.setTexture(p.b, p.f).setScale(heroScale(p.b));
     else this.sprite.setFrame(p.f);
     this.shadow.setVisible(p.sh);
     if (p.tk && this.sprite.scene.textures.exists(p.tk)) this.tool.setTexture(p.tk, p.tf).setFlipX(p.fl).setVisible(true);

@@ -13,8 +13,9 @@ export interface HeroDef {
   texture: string;
   /** Code-drawn farmers only. */
   look?: CharacterLook;
-  /** PNG sheet (in public/, PLAYER_ART frame size) loaded by BootScene, for drawn farmers. */
-  sheet?: string;
+  /** Drawn farmers: PNG sheet in public/ (loaded by BootScene), drawn at `res` times the game's
+   * pixel size (PLAYER_ART cells times res) and shown at 1 / res, so fine details survive. */
+  sheet?: { url: string; res: number };
   /** Generic farmers take the player's own name; this is the suggestion. */
   defaultName: string;
   namable: boolean;
@@ -56,9 +57,9 @@ export const HEROES: HeroDef[] = [
       hat: { style: 'caping', ramp: ['clay', 'amber', 'gold', 'cream'] },
     },
   },
-  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: 'sprites/alvira.png', defaultName: 'Alvira', namable: false },
+  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: { url: 'sprites/alvira.png', res: 1 }, defaultName: 'Alvira', namable: false },
   // For testing Zulfian's new drawing (tools/build_alvira2.py); she is still Alvira in the story.
-  { id: 'alvira2', label: 'Alvira 2.0 Testing', texture: 'char-alvira2', sheet: 'sprites/alvira2.png', defaultName: 'Alvira', namable: false },
+  { id: 'alvira2', label: 'Alvira 2.0 Testing', texture: 'char-alvira2', sheet: { url: 'sprites/alvira2.png', res: 2 }, defaultName: 'Alvira', namable: false },
 ];
 
 export const DEFAULT_HERO: HeroId = 'alvira';
@@ -67,6 +68,11 @@ export const NAME_MAX = 12;
 
 export function heroDef(id: string): HeroDef {
   return HEROES.find((h) => h.id === id) ?? HEROES.find((h) => h.id === DEFAULT_HERO)!;
+}
+
+/** Display scale for a farmer's texture (1 / res for drawn sheets), by texture key. */
+export function heroScale(texture: string): number {
+  return 1 / (HEROES.find((h) => h.texture === texture)?.sheet?.res ?? 1);
 }
 
 export function cleanHeroName(raw: string): string {
