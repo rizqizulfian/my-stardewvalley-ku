@@ -45,12 +45,6 @@ export const PLAYER = {
   idleFrameMs: 650,
 } as const;
 
-/** Frame size (in game pixels) of the drawn farmers' PNG sheets (public/sprites/, built by tools/build_alvira*.py). */
-export const PLAYER_ART = {
-  frameWidth: 18,
-  frameHeight: 30,
-} as const;
-
 export const CAMERA = {
   /** 0..1 smoothing factor applied per 1/60 s; positions are rounded after smoothing. */
   followLerp: 0.18,

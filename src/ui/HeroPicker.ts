@@ -137,8 +137,8 @@ function draw(): void {
     const ctx = cv.getContext('2d');
     if (!ctx || !open!.textures.exists(h.texture)) return;
     const f = open!.textures.getFrame(h.texture, h.id === picked ? frame : CHAR_FRAMES.idle[0]);
-    // The canvas holds PREVIEW.res pixels per game pixel, so drawn sheets keep their detail.
-    const k = PREVIEW.res * heroScale(h.texture);
+    // The canvas holds PREVIEW.res pixels per game pixel; a farmer taller than it is fitted in.
+    const k = Math.min(PREVIEW.res * heroScale(h.texture), cv.height / f.cutHeight);
     const w = f.cutWidth * k;
     const hh = f.cutHeight * k;
     ctx.imageSmoothingEnabled = false;
