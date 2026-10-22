@@ -104,6 +104,8 @@ export class AudioManager {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private buses!: Record<Bus, GainNode>;
+  /** Between the music bus and master: dips the music under sound effects. */
+  private musicDuck!: GainNode;
   private reverbIn!: GainNode;
   private analyser!: AnalyserNode;
   private current: ActiveTrack | null = null;
@@ -167,6 +169,9 @@ export class AudioManager {
       return g;
     };
     this.buses = { music: mk(0), ambience: mk(0), sfx: mk(0) };
+    this.musicDuck = ctx.createGain();
+    this.buses.music.disconnect();
+    this.buses.music.connect(this.musicDuck).connect(this.master);
     this.applyVolumes(0);
 
     const conv = ctx.createConvolver();
@@ -332,12 +337,26 @@ export class AudioManager {
   playSfx(name: string, gain = 1, pitch = 1): void {
     const fn = SFX[name];
     if (!fn || !this.started) return;
-    this.withGain(gain, (dest, t, p) => fn(this.ctx!, dest, t, p * pitch));
+    this.withGain(gain * AUDIO.sfxBoost, (dest, t, p) => fn(this.ctx!, dest, t, p * pitch));
+    this.duck(gain);
   }
 
   footstep(surface: Surface): void {
     if (!this.started) return;
-    this.withGain(1, (dest, t, p) => FOOTSTEPS[surface](this.ctx!, dest, t, p));
+    this.withGain(AUDIO.footstepBoost, (dest, t, p) => FOOTSTEPS[surface](this.ctx!, dest, t, p));
+  }
+
+  /** Briefly lower the music so a sound effect stands out; quiet ones dip it less. */
+  private duck(gain: number): void {
+    if (this.settings.sfx <= 0) return;
+    const now = this.ctx!.currentTime;
+    const depth = 1 - (1 - AUDIO.musicDuck) * Math.min(1, gain);
+    const g = this.musicDuck.gain;
+    const from = g.value;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(from, now);
+    g.linearRampToValueAtTime(Math.min(from, depth), now + AUDIO.duckAttackSeconds);
+    g.setTargetAtTime(1, now + AUDIO.duckAttackSeconds + 0.12, AUDIO.duckReleaseSeconds / 3);
   }
 
   private withGain(gain: number, play: (dest: AudioNode, t: number, pitch: number) => void): void {

@@ -140,7 +140,9 @@ export const TRACKS: TrackDef[] = [
     kind: 'file',
     id: 'apple-cider',
     url: 'audio/apple-cider.ogg',
-    gain: 0.8,
+    // A mastered recording is far louder than the synthesised tracks; this
+    // brings it to about the same loudness so it does not bury the SFX.
+    gain: 0.36,
     rainAlt: 'farm-day',
   },
   {
@@ -148,7 +150,7 @@ export const TRACKS: TrackDef[] = [
     kind: 'file',
     id: 'dog-dance',
     url: 'audio/dog-dance.ogg',
-    gain: 0.55,
+    gain: 0.4,
   },
   {
     // The park: sunny and open, marimba over brushed drums.

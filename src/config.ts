@@ -145,11 +145,22 @@ export const ATMOSPHERE = {
 } as const;
 
 export const AUDIO = {
-  masterVolume: 0.9,
+  masterVolume: 1.2,
   /** Defaults, 0..1. Music starts low on purpose. */
-  defaultMusicVolume: 0.32,
+  defaultMusicVolume: 0.28,
   defaultAmbienceVolume: 0.45,
-  defaultSfxVolume: 0.6,
+  defaultSfxVolume: 0.7,
+  /**
+   * Fixed make-up gain on sound effects (on top of the slider), so a hoe or a
+   * coin is clearly heard over the music at default volumes. Footsteps get
+   * less, since they play constantly.
+   */
+  sfxBoost: 2.6,
+  footstepBoost: 1.6,
+  /** Music dips to this fraction while a sound effect plays, then comes back. */
+  musicDuck: 0.6,
+  duckAttackSeconds: 0.03,
+  duckReleaseSeconds: 0.5,
   crossfadeSeconds: 2.5,
   /** How far ahead (s) the sequencer schedules notes. */
   scheduleAheadSeconds: 0.25,
