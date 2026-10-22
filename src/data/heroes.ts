@@ -13,9 +13,9 @@ export interface HeroDef {
   texture: string;
   /** Code-drawn farmers only. */
   look?: CharacterLook;
-  /** Drawn farmers: PNG sheet in public/ (loaded by BootScene), drawn at `res` times the game's
-   * pixel size (PLAYER_ART cells times res) and shown at 1 / res, so fine details survive. */
-  sheet?: { url: string; res: number };
+  /** Drawn farmers: PNG sheet in public/ (loaded by BootScene) with its cell size, drawn at `res`
+   * sheet pixels per game pixel (shown at 1 / res). */
+  sheet?: { url: string; frameWidth: number; frameHeight: number; res: number };
   /** Generic farmers take the player's own name; this is the suggestion. */
   defaultName: string;
   namable: boolean;
@@ -57,9 +57,17 @@ export const HEROES: HeroDef[] = [
       hat: { style: 'caping', ramp: ['clay', 'amber', 'gold', 'cream'] },
     },
   },
-  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: { url: 'sprites/alvira.png', res: 1 }, defaultName: 'Alvira', namable: false },
+  { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: { url: 'sprites/alvira.png', frameWidth: 18, frameHeight: 30, res: 1 }, defaultName: 'Alvira', namable: false },
   // For testing Zulfian's new drawing (tools/build_alvira2.py); she is still Alvira in the story.
-  { id: 'alvira2', label: 'Alvira 2.0 Testing', texture: 'char-alvira2', sheet: { url: 'sprites/alvira2.png', res: 2 }, defaultName: 'Alvira', namable: false },
+  // Drawn bigger than the villagers so the drawing's details show (the canvas is at game resolution).
+  {
+    id: 'alvira2',
+    label: 'Alvira 2.0 Testing',
+    texture: 'char-alvira2',
+    sheet: { url: 'sprites/alvira2.png', frameWidth: 26, frameHeight: 44, res: 1 },
+    defaultName: 'Alvira',
+    namable: false,
+  },
 ];
 
 export const DEFAULT_HERO: HeroId = 'alvira';

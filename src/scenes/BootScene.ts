@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { registerAllArt } from '../art';
 import { PhaserTextureSink } from '../art/pixel';
-import { PLAYER_ART } from '../config';
 import { HEROES } from '../data/heroes';
 
 /** Loads the drawn farmers' PNG sheets, generates every other texture, then starts the world and the UI overlay. */
@@ -12,7 +11,7 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     for (const h of HEROES)
-      if (h.sheet) this.load.spritesheet(h.texture, h.sheet.url, { frameWidth: PLAYER_ART.frameWidth * h.sheet.res, frameHeight: PLAYER_ART.frameHeight * h.sheet.res });
+      if (h.sheet) this.load.spritesheet(h.texture, h.sheet.url, { frameWidth: h.sheet.frameWidth, frameHeight: h.sheet.frameHeight });
   }
 
   create(): void {
