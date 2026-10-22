@@ -7,6 +7,7 @@ import { PALETTE } from '../art/palette';
 import { audio } from '../audio/AudioManager';
 import { COOP, NET, cleanCode, cleanName, coop } from '../net/coop';
 import { bus } from '../systems/events';
+import { state } from '../systems/GameState';
 
 const NAME_KEY = 'lembah-padi-name';
 const P = PALETTE;
@@ -56,9 +57,9 @@ let invited = '';
 
 function savedName(): string {
   try {
-    return localStorage.getItem(NAME_KEY) ?? '';
+    return localStorage.getItem(NAME_KEY) ?? state.name;
   } catch {
-    return '';
+    return state.name;
   }
 }
 

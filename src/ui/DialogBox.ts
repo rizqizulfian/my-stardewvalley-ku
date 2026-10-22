@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { hex } from '../art/palette';
 import { audio } from '../audio/AudioManager';
+import { fillName } from '../data/heroes';
+import { state } from '../systems/GameState';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
 
@@ -116,7 +118,7 @@ export class DialogBox {
   }
 
   private get text(): string {
-    return this.req?.pages[this.page] ?? '';
+    return fillName(this.req?.pages[this.page] ?? '', state.name);
   }
 
   private get lastPage(): boolean {

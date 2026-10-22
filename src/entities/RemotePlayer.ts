@@ -46,7 +46,8 @@ export class RemotePlayer {
       this.x = p.x;
       this.y = p.y;
     }
-    this.sprite.setFrame(p.f);
+    if (p.b && p.b !== this.sprite.texture.key && this.sprite.scene.textures.exists(p.b)) this.sprite.setTexture(p.b, p.f);
+    else this.sprite.setFrame(p.f);
     this.shadow.setVisible(p.sh);
     if (p.tk && this.sprite.scene.textures.exists(p.tk)) this.tool.setTexture(p.tk, p.tf).setFlipX(p.fl).setVisible(true);
     else this.tool.setVisible(false);

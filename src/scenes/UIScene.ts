@@ -25,6 +25,7 @@ import type { IntroData } from './IntroScene';
 import type { TourData } from './TourScene';
 import { tourView } from './WorldScene';
 import { openCoopPanel } from '../ui/CoopPanel';
+import { closeHeroPicker, isHeroPickerOpen, openHeroPicker, type HeroChoice } from '../ui/HeroPicker';
 
 const PROMPT = {
   width: 150,
@@ -105,6 +106,20 @@ export class UIScene extends Phaser.Scene {
     this.shop = new ShopMenu(this, state);
     this.settings = new SettingsMenu(this, state);
     this.settings.onCoop = () => openCoopPanel();
+    this.settings.onHero = () => {
+      openHeroPicker({
+        textures: this.textures,
+        current: { hero: state.hero, name: state.name },
+        canCancel: true,
+        onDone: (c) => {
+          this.applyHero(c);
+          this.syncModal();
+          bus.emit(EV.notice, `You are ${state.name} now.`);
+        },
+        onCancel: () => this.syncModal(),
+      });
+      this.syncModal();
+    };
     this.settings.onNewFarm = () => {
       // Back to the opening story; the world waits until it ends.
       this.started = false;
@@ -161,6 +176,7 @@ export class UIScene extends Phaser.Scene {
     // Joined a friend's room (maybe straight from the title or the opening story): into their world.
     const onJoined = () => {
       this.dropPrompt();
+      closeHeroPicker();
       for (const k of ['Intro', 'Tour']) if (this.scene.isActive(k)) this.scene.stop(k);
       tourView.active = false;
       if (!this.started) this.startPlaying();
@@ -264,7 +280,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private anyModal(): boolean {
-    return this.menu.isOpen || this.shop.isOpen || this.dialog.isOpen || this.summary.isOpen || this.settings.isOpen;
+    return this.menu.isOpen || this.shop.isOpen || this.dialog.isOpen || this.summary.isOpen || this.settings.isOpen || isHeroPickerOpen();
   }
 
   /** One place decides whether the world is paused and which HUD shows. */
@@ -298,8 +314,26 @@ export class UIScene extends Phaser.Scene {
     this.time.delayedCall(HELP.showMs, () => this.tweens.add({ targets: this.help, alpha: 0, duration: 800, onComplete: () => this.help.setVisible(false) }));
   }
 
-  /** The opening story and the tour of the valley, once per farm, then the game. */
+  private applyHero(c: HeroChoice): void {
+    state.hero = c.hero;
+    state.name = c.name;
+    bus.emit(EV.heroChanged);
+  }
+
+  /** A new farm: choose the farmer, then the opening story and the tour of the valley, then the game. */
   private playIntro(): void {
+    openHeroPicker({
+      textures: this.textures,
+      current: { hero: state.hero, name: state.name },
+      canCancel: false,
+      onDone: (c) => {
+        this.applyHero(c);
+        this.playStory();
+      },
+    });
+  }
+
+  private playStory(): void {
     const data: IntroData = {
       onDone: () => {
         state.introSeen = true;

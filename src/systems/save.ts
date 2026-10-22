@@ -2,6 +2,7 @@
 // each morning after sleeping.
 
 import { FARM, SAVE } from '../config';
+import { cleanHeroName, heroDef } from '../data/heroes';
 import { ITEMS } from '../data/items';
 import { MAPS } from '../data/maps';
 import { newGameState, type GameState } from './GameState';
@@ -41,6 +42,10 @@ export function loadGame(): GameState | null {
     if (!MAPS[s.mapId]) s.mapId = fresh.mapId;
     // Saves from before the opening story already know the farm.
     if (saved.introSeen === undefined) s.introSeen = true;
+    // Saves from before the character choice were Alvira.
+    const hero = heroDef(s.hero);
+    s.hero = hero.id;
+    s.name = hero.namable ? cleanHeroName(s.name ?? '') || hero.defaultName : hero.defaultName;
     return s;
   } catch (e) {
     console.warn('[save] could not load', e);

@@ -37,7 +37,7 @@ export const INTRO_SHOTS: IntroShot[] = [
     panel: 'letter',
     music: 'home',
     lines: [
-      '"Alvira, cucuku sayang, kalau kamu membaca surat ini, mungkin kamu sedang lelah."',
+      '"{name}, cucuku sayang, kalau kamu membaca surat ini, mungkin kamu sedang lelah."',
       '"Rumah dan kebun Nenek di Lembah Padi sekarang milikmu. Tanahnya subur, tetangganya baik hati."',
       '"Tanamlah sesuatu, lalu rawat pelan-pelan. Kamu akan ikut tumbuh bersamanya."',
       '"Peluk dari jauh, Nek Lastri."',
@@ -58,7 +58,7 @@ export const INTRO_SHOTS: IntroShot[] = [
     music: 'farm-morning',
     lines: [
       'Kebunnya penuh rumput liar, tapi rumah Nenek masih berdiri di tempatnya.',
-      'Selamat datang di rumah barumu, Alvira.',
+      'Selamat datang di rumah barumu, {name}.',
     ],
   },
 ];
