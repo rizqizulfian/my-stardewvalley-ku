@@ -3,6 +3,7 @@ import { DEBUG, GAME_TITLE } from '../config';
 import type { DaySummary } from '../systems/day';
 import { audio } from '../audio/AudioManager';
 import { OPENING_TRACK } from '../data/music';
+import { NET } from '../net/coop';
 import { EV, bus } from '../systems/events';
 import { newGameState, state } from '../systems/GameState';
 import { clearSave, hasSave } from '../systems/save';
@@ -22,6 +23,8 @@ import { PixelText } from '../ui/PixelText';
 import { Notice, Toasts } from '../ui/Toasts';
 import type { IntroData } from './IntroScene';
 import type { TourData } from './TourScene';
+import { tourView } from './WorldScene';
+import { openCoopPanel } from '../ui/CoopPanel';
 
 const PROMPT = {
   width: 150,
@@ -67,6 +70,8 @@ export class UIScene extends Phaser.Scene {
   private started = false;
   /** Released after the start prompt is gone, so the key that starts the game is not read twice. */
   private wasModal = false;
+  /** Takes the title prompt away without starting the usual way (joining a co-op room). */
+  private dropPrompt: () => void = () => undefined;
 
   constructor() {
     super('UI');
@@ -99,6 +104,7 @@ export class UIScene extends Phaser.Scene {
     this.menu = new InventoryMenu(this, state);
     this.shop = new ShopMenu(this, state);
     this.settings = new SettingsMenu(this, state);
+    this.settings.onCoop = () => openCoopPanel();
     this.settings.onNewFarm = () => {
       // Back to the opening story; the world waits until it ends.
       this.started = false;
@@ -152,6 +158,17 @@ export class UIScene extends Phaser.Scene {
     bus.on(EV.dialog, onDialog);
     bus.on(EV.shop, onShop);
     bus.on(EV.daySummary, onSummary);
+    // Joined a friend's room (maybe straight from the title or the opening story): into their world.
+    const onJoined = () => {
+      this.dropPrompt();
+      for (const k of ['Intro', 'Tour']) if (this.scene.isActive(k)) this.scene.stop(k);
+      tourView.active = false;
+      if (!this.started) this.startPlaying();
+      this.clock.update(state);
+      bus.emit(EV.inventoryChanged);
+    };
+    bus.on(NET.joined, onJoined);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off(NET.joined, onJoined));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off(EV.inventoryChanged, refreshInv);
       bus.off(EV.goldChanged, refreshInv);
@@ -316,11 +333,12 @@ export class UIScene extends Phaser.Scene {
     const press = new PixelText(this, 0, 45, saved ? 'Press any key to continue' : 'Press any key to start', { color: 'night', shadow: 'mist' });
     press.x = Math.round((PROMPT.width - press.width) / 2);
     box.add([panel, title, sub, press]);
-    if (saved) {
-      const fresh = new PixelText(this, 0, PROMPT.height + 3, 'Delete: start a new farm', { color: 'cream', outline: 'night' });
-      fresh.x = Math.round((PROMPT.width - fresh.width) / 2);
-      box.add(fresh);
-    }
+    const below = [...(saved ? ['Delete: start a new farm'] : []), touch ? 'Menu: play together (co-op)' : 'P: play together (co-op)'];
+    below.forEach((line, i) => {
+      const t = new PixelText(this, 0, PROMPT.height + 3 + i * 10, line, { color: 'cream', outline: 'night' });
+      t.x = Math.round((PROMPT.width - t.width) / 2);
+      box.add(t);
+    });
     const blink = this.time.addEvent({ delay: PROMPT.blinkMs, loop: true, callback: () => press.setVisible(!press.visible) });
 
     let begun = false;
@@ -342,8 +360,21 @@ export class UIScene extends Phaser.Scene {
         },
       });
     };
+    this.dropPrompt = () => {
+      if (begun) return;
+      begun = true;
+      blink.remove();
+      this.input.keyboard?.off('keydown', onKey);
+      void audio.unlock();
+      this.tweens.add({ targets: box, alpha: 0, duration: PROMPT.fadeMs, onComplete: () => box.destroy() });
+      this.prompt = null;
+    };
     const onKey = (e: KeyboardEvent) => {
       if (this.started) return;
+      if (e.key === 'p' || e.key === 'P') {
+        openCoopPanel();
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && hasSave()) {
         this.dialog.open({
           pages: ['Start a new farm? This erases your saved game.'],

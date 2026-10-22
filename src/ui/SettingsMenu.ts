@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { hex } from '../art/palette';
 import { audio, type Bus } from '../audio/AudioManager';
+import { coop } from '../net/coop';
 import { EV, bus } from '../systems/events';
 import type { GameState } from '../systems/GameState';
 import { saveGame } from '../systems/save';
@@ -37,7 +38,7 @@ type RowKind =
   | { kind: 'volume'; bus: Bus; label: string }
   | { kind: 'mute' }
   | { kind: 'zoom'; label: string }
-  | { kind: 'action'; id: 'save' | 'new' | 'close'; label: string };
+  | { kind: 'action'; id: 'coop' | 'save' | 'new' | 'close'; label: string };
 
 const ROWS: RowKind[] = [
   { kind: 'volume', bus: 'music', label: 'Music' },
@@ -45,6 +46,7 @@ const ROWS: RowKind[] = [
   { kind: 'volume', bus: 'sfx', label: 'Sound effects' },
   { kind: 'mute' },
   { kind: 'zoom', label: 'Zoom' },
+  { kind: 'action', id: 'coop', label: 'Play together (co-op)' },
   { kind: 'action', id: 'save', label: 'Save now' },
   { kind: 'action', id: 'new', label: 'Start a new farm' },
   { kind: 'action', id: 'close', label: 'Back to the game' },
@@ -64,6 +66,8 @@ export class SettingsMenu {
   private confirmUntil = 0;
   /** Starts a fresh farm (the scene owns the reset). */
   onNewFarm: () => void = () => undefined;
+  /** Opens the co-op room panel. */
+  onCoop: () => void = () => undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -161,6 +165,16 @@ export class SettingsMenu {
     if (r.kind === 'mute') {
       audio.toggleMute();
       audio.playSfx('uiClick', 0.8);
+    } else if (r.id === 'coop') {
+      this.close();
+      this.onCoop();
+      return;
+    } else if (r.id === 'save' && coop.isGuest) {
+      audio.playSfx('bonk', 0.6);
+      bus.emit(EV.notice, "This is the host's farm: their game keeps it saved.");
+    } else if (r.id === 'new' && coop.active) {
+      audio.playSfx('bonk', 0.6);
+      bus.emit(EV.notice, 'Leave the co-op room first (Play together > Leave).');
     } else if (r.id === 'save') {
       const ok = saveGame(this.state);
       audio.playSfx(ok ? 'coin' : 'bonk', 0.8);
