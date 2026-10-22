@@ -19,12 +19,15 @@ Every sound effect and ambience layer (birds, crickets, wind, water, waves, gull
 
 ## Art
 
-All art is drawn by code at boot from the palette in `src/art/palette.ts`. The museum's paintings, sculptures
+All art except the player sprite (see Alvira below) is drawn by code at boot from the palette in `src/art/palette.ts`. The museum's paintings, sculptures
 and artists are made up for the game. The dancing dog is an original doodle inspired by a reference the
 project owner shared.
 
 ## Characters
 
+* **Alvira**, the player character, uses sprite frames supplied by the project owner (`sprites.zip`, 20 poses),
+  packed into `public/sprites/alvira.png` by `tools/build_alvira.py`. Origin and licence are the owner's; ask them
+  before reusing the art elsewhere.
 * **Jotaro** and **Star Platinum** are fan tributes to *JoJo's Bizarre Adventure* by Hirohiko Araki
   (characters owned by Araki / Shueisha), redrawn as original pixel art at the project owner's request.
   Fine for a personal project; remove or replace them before publishing the game commercially.
