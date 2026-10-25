@@ -168,6 +168,12 @@ export class WorldScene extends Phaser.Scene {
     this.tools.onTalk = (px, py) => {
       if (this.dog && this.dog.distanceTo(px, py) < 24) return this.talkToDog();
       if (this.disco && this.disco.distanceTo(px, py) < 24) return this.talkToPuppy();
+      const shout = this.disco?.crowd.shoutNear(px, py);
+      if (shout) {
+        this.player.face(shout.x, shout.y - 6);
+        dialog({ pages: [shout.text] });
+        return true;
+      }
       const n = this.npcs.at(px, py);
       const a = this.animals.at(px, py);
       if (a && (!n || a.distanceTo(px, py) < Math.hypot(px - n.x, py - n.y + 6))) {
