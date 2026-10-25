@@ -2,6 +2,8 @@
 // sign that cycles colours, and inside, the disco itself: a mirror ball,
 // a DJ booth, speakers that thump, and a doodle puppy dancing under the ball.
 
+import { PLAYER } from '../config';
+import { CHAR_FRAMES, buildCharacterFrames, type CharacterLook } from './characters';
 import { PixelGrid, hash2, outline, shade, type ShadeOptions, type TextureSink } from './pixel';
 import { RAMPS, type ColorName, type Ramp } from './palette';
 import { textGrid } from './font';
@@ -16,6 +18,75 @@ export const DISCO_TEXTURES = {
   sign: 'disco-sign',
   speck: 'disco-speck',
 } as const;
+
+/** The disco song runs at about 165 bpm. */
+export const DISCO_BEAT_MS = 60000 / 165;
+
+export const crowdTexture = (i: number) => `disco-crowd-${i}`;
+
+// ---------------------------------------------------------------------------
+// The crowd: party-goers mixed from a few hair, skin and outfit choices.
+
+const HAIRS: Array<CharacterLook['hair']> = [
+  ['ink', 'night', 'plum'],
+  ['bark', 'umber', 'clay'],
+  ['umber', 'clay', 'tan'],
+  ['violet', 'lilac', 'rose'],
+  ['clay', 'amber', 'gold'],
+  ['deep', 'sea', 'sky'],
+];
+const SKINS: Array<CharacterLook['skin']> = [
+  ['umber', 'skinShade', 'skin', 'peach'],
+  ['bark', 'umber', 'skinShade', 'skin'],
+  ['umber', 'skinShade', 'skin', 'cream'],
+];
+const SHIRTS: Array<CharacterLook['shirt']> = [
+  ['wine', 'brick', 'coral', 'peach'],
+  ['night', 'violet', 'lilac', 'rose'],
+  ['deep', 'sea', 'sky', 'foam'],
+  ['clay', 'amber', 'gold', 'cream'],
+  ['pine', 'moss', 'leaf', 'lime'],
+  ['ink', 'night', 'plum', 'mauve'],
+  ['wine', 'rose', 'peach', 'cream'],
+];
+const PANTS: Array<CharacterLook['pants']> = [
+  ['ink', 'night', 'plum'],
+  ['deep', 'sea', 'sky'],
+  ['bark', 'umber', 'clay'],
+  ['plum', 'mauve', 'haze'],
+];
+const HATS: Array<CharacterLook['hat']> = [
+  undefined,
+  undefined,
+  undefined,
+  { style: 'cap', ramp: ['wine', 'brick', 'coral', 'peach'] },
+  { style: 'hijab', ramp: ['night', 'violet', 'lilac', 'rose'] },
+  { style: 'cap', ramp: ['ink', 'night', 'plum', 'mauve'] },
+  { style: 'hijab', ramp: ['deep', 'sea', 'sky', 'foam'] },
+];
+const STYLES: Array<CharacterLook['hairStyle']> = ['short', 'long', 'bun', 'short', 'long'];
+const OUTFITS: Array<CharacterLook['outfit']> = ['shirt', 'shirt', 'dress', 'coat', 'shirt', 'dress'];
+
+export const CROWD_SIZE = 18;
+
+function crowdLook(i: number): CharacterLook {
+  const pick = <T>(list: T[], salt: number) => list[Math.floor(hash2(i, salt, 404) * list.length)];
+  const outfit = pick(OUTFITS, 5);
+  return {
+    hair: pick(HAIRS, 1),
+    skin: pick(SKINS, 2),
+    eye: 'night',
+    shirt: pick(SHIRTS, 3),
+    pants: pick(PANTS, 4),
+    shoes: ['ink', 'night'],
+    outfit,
+    inner: outfit === 'coat' ? ['cream', 'mist'] : undefined,
+    hairStyle: pick(STYLES, 6),
+    hat: pick(HATS, 7),
+    scarf: NEON[i % NEON.length],
+    small: i % 7 === 5,
+  };
+}
 
 /** Neon colours the sign, lights and floor cycle through. */
 export const NEON: ColorName[] = ['rose', 'sky', 'gold', 'lime', 'lilac', 'coral'];
@@ -237,4 +308,6 @@ export function registerDisco(sink: TextureSink): void {
   sink.sheet(DISCO_TEXTURES.speaker, [speaker(0), speaker(1)], 18, 30);
   sink.sheet(DISCO_TEXTURES.sign, Array.from({ length: NEON.length }, (_, f) => wallSign(f)), 48, 16);
   sink.image(DISCO_TEXTURES.speck, speck());
+  for (let i = 0; i < CROWD_SIZE; i++)
+    sink.sheet(crowdTexture(i), buildCharacterFrames(crowdLook(i)), PLAYER.frameWidth, PLAYER.frameHeight, CHAR_FRAMES.perFacing);
 }

@@ -5,16 +5,17 @@
 
 import Phaser from 'phaser';
 import { DEPTH, RENDER } from '../config';
-import { DISCO_BALL, DISCO_TEXTURES, NEON, PUPPY } from '../art/disco';
+import { DISCO_BALL, DISCO_BEAT_MS, DISCO_TEXTURES, NEON, PUPPY } from '../art/disco';
 import { EMOTE, FX_TEXTURES } from '../art/fx';
 import { hex } from '../art/palette';
 import { PROP_TEXTURES } from '../art/props';
 import type { MapDef } from '../data/maps/types';
 import type { Box } from '../data/props';
 import { worldDepth } from '../systems/MapRenderer';
+import { DiscoCrowd } from './DiscoCrowd';
 
 const T = RENDER.tileSize;
-export const DISCO_BEAT_MS = 60000 / 165;
+export { DISCO_BEAT_MS };
 /** Solid area around the puppy's feet. */
 const BODY = { w: 18, h: 8 } as const;
 const SPECKS = 46;
@@ -38,6 +39,7 @@ export class Disco {
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly emote: Phaser.GameObjects.Image;
   private readonly specks: Speck[] = [];
+  readonly crowd: DiscoCrowd;
   private readonly area: { x0: number; y0: number; x1: number; y1: number };
   private readonly roomW: number;
   private readonly roomH: number;
@@ -70,6 +72,7 @@ export class Disco {
     this.emote = scene.add.image(this.x, this.y - PUPPY.h - 4, FX_TEXTURES.emote, EMOTE.heart).setDepth(DEPTH.particlesAbove).setVisible(false);
     // The ball hangs from the ceiling over the puppy's head, above everything.
     this.ball = scene.add.sprite(this.x, this.y - PUPPY.h - 16, DISCO_TEXTURES.ball, 0).setOrigin(0.5, 1).setDepth(DEPTH.particlesAbove);
+    this.crowd = new DiscoCrowd(scene);
     for (let i = 0; i < SPECKS; i++) {
       const img = scene.add
         .image(0, 0, DISCO_TEXTURES.speck)
@@ -83,7 +86,7 @@ export class Disco {
   blocks(b: Box): boolean {
     const x0 = this.x - BODY.w / 2;
     const y0 = this.y - BODY.h;
-    return b.x < x0 + BODY.w && b.x + b.w > x0 && b.y < y0 + BODY.h && b.y + b.h > y0;
+    return (b.x < x0 + BODY.w && b.x + b.w > x0 && b.y < y0 + BODY.h && b.y + b.h > y0) || this.crowd.blocks(b);
   }
 
   distanceTo(px: number, py: number): number {
@@ -112,6 +115,7 @@ export class Disco {
     this.flash.setAlpha(0.07 * Math.max(0, 1 - inBeat * 2.5));
     this.puppy.setY(this.y + 2 - (inBeat < 0.3 ? 1 : 0));
     this.ball.setFrame(Math.floor(this.t / 140) % DISCO_BALL.frames);
+    this.crowd.update(deltaMs);
     this.updateSpecks(deltaMs);
     this.drawBeams();
     if (this.emoteMs > 0) {
@@ -209,5 +213,6 @@ export class Disco {
     this.shadow.destroy();
     this.emote.destroy();
     for (const s of this.specks) s.img.destroy();
+    this.crowd.destroy();
   }
 }
