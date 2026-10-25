@@ -11,6 +11,7 @@ import { MAPS } from '../data/maps';
 import { musicFor } from '../data/music';
 import { SHOPS } from '../data/shops';
 import type { MapDef, WarpDef } from '../data/maps/types';
+import { DISCO_BEAT_MS, Disco } from '../entities/Disco';
 import { DOG_BEAT_MS, DogDance } from '../entities/DogDance';
 import { Player } from '../entities/Player';
 import { RemotePlayer } from '../entities/RemotePlayer';
@@ -99,6 +100,7 @@ export class WorldScene extends Phaser.Scene {
   private weather!: Weather;
   private mailFlag: Phaser.GameObjects.Image | null = null;
   private dog: DogDance | null = null;
+  private disco: Disco | null = null;
   private closedNoticeAt = 0;
   private camX = 0;
   private camY = 0;
@@ -134,7 +136,7 @@ export class WorldScene extends Phaser.Scene {
     if (tourView.active) this.player.setVisible(false);
 
     this.time2 = new TimeSystem(state);
-    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor, this.def.interiorStyle === 'paper');
+    this.atmosphere = new Atmosphere(this, this.rendered, this.def.leaves, !!this.def.indoor, this.def.interiorStyle === 'paper' || this.def.interiorStyle === 'disco');
     this.weather = new Weather(this, state.weather, !!this.def.indoor, this.map.pixelWidth, this.map.pixelHeight);
     this.fx = new Effects(this);
     this.fx.collect = (id, qty) => {
@@ -146,8 +148,9 @@ export class WorldScene extends Phaser.Scene {
     this.tools = new ToolController(this, state, this.map, this.rendered, this.farm, this.player, this.fx);
     this.npcs = new NpcSystem(this, this.map, state, this.fx);
     this.dog = this.def.dancer ? new DogDance(this, this.def.dancer) : null;
+    this.disco = this.def.disco ? new Disco(this, this.def.disco, this.map.pixelWidth, this.map.pixelHeight) : null;
     this.animals = new AnimalSystem(this, this.map, state, this.fx);
-    this.player.blocked = (b) => this.npcs.blocked(b) || this.animals.blocked(b) || !!this.dog?.blocks(b);
+    this.player.blocked = (b) => this.npcs.blocked(b) || this.animals.blocked(b) || !!this.dog?.blocks(b) || !!this.disco?.blocks(b);
     this.fishing = new Fishing(this, state, this.map, this.player, this.fx);
     // The host spreads each day's forage; guests are sent theirs.
     if (!coop.isGuest) ensureForage(state);
@@ -164,6 +167,7 @@ export class WorldScene extends Phaser.Scene {
     this.tools.onCast = () => this.fishing.cast();
     this.tools.onTalk = (px, py) => {
       if (this.dog && this.dog.distanceTo(px, py) < 24) return this.talkToDog();
+      if (this.disco && this.disco.distanceTo(px, py) < 24) return this.talkToPuppy();
       const n = this.npcs.at(px, py);
       const a = this.animals.at(px, py);
       if (a && (!n || a.distanceTo(px, py) < Math.hypot(px - n.x, py - n.y + 6))) {
@@ -265,6 +269,8 @@ export class WorldScene extends Phaser.Scene {
       this.weather.destroy();
       this.dog?.destroy();
       this.dog = null;
+      this.disco?.destroy();
+      this.disco = null;
       this.mailFlag = null;
       this.npcs.destroy();
       this.animals.destroy();
@@ -430,6 +436,21 @@ export class WorldScene extends Phaser.Scene {
       choices: ['Dance along!', 'Just watch'],
       onChoose: (i) => {
         if (i === 0) this.time.delayedCall(250, () => this.player.dance(16, DOG_BEAT_MS, () => dog.love()));
+      },
+    });
+    return true;
+  }
+
+  private talkToPuppy(): boolean {
+    const disco = this.disco!;
+    this.player.face(disco.x, disco.y - 8);
+    disco.love();
+    audio.playSfx('heart', 0.7);
+    dialog({
+      pages: ['A little puppy is grooving under the mirror ball. It points at the ceiling, then at you. Your turn!'],
+      choices: ['Hit the dance floor!', 'Just watch'],
+      onChoose: (i) => {
+        if (i === 0) this.time.delayedCall(250, () => this.player.dance(24, DISCO_BEAT_MS, () => disco.love()));
       },
     });
     return true;
@@ -690,6 +711,7 @@ export class WorldScene extends Phaser.Scene {
     this.npcs.update(delta, this.player.x, this.player.y, this.player.feet());
     this.animals.update(delta, this.player.x, this.player.y, this.player.feet());
     this.dog?.update(delta, (x, y) => this.npcs.note(x, y));
+    this.disco?.update(delta, (x, y) => this.npcs.note(x, y));
     this.fx.update(delta, this.player.x, this.player.y);
     for (const r of this.remotes.values()) r.update(delta);
     if (coop.active && !tourView.active) coop.setPose(this.player.pose(this.def.id));

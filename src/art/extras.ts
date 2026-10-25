@@ -49,12 +49,13 @@ function oval(g: PixelGrid, x: number, y: number, w: number, h: number, ramp: Ra
 // The doodle dog: a white blob with floppy black ears, dot eyes and a dot
 // nose, drawn with a pen-black line.
 
-interface DogPose {
+export interface DogPose {
   dx: number;
   head: number;
   back?: boolean;
-  armL: 'down' | 'up' | 'out';
-  armR: 'down' | 'up' | 'out';
+  /** 'point' is the disco finger, straight up and out; 'low' points down across the hip. */
+  armL: 'down' | 'up' | 'out' | 'point' | 'low';
+  armR: 'down' | 'up' | 'out' | 'point' | 'low';
   squash?: boolean;
 }
 
@@ -69,7 +70,7 @@ const DOG_POSES: DogPose[] = [
   { dx: 1, head: 1, back: true, armL: 'out', armR: 'out' },
 ];
 
-function dogFrame(p: DogPose): PixelGrid {
+export function dogFrame(p: DogPose): PixelGrid {
   const { w: W, h: H } = DOG;
   const cx = 15;
   const s = p.squash ? 1 : 0;
@@ -109,6 +110,8 @@ function dogFrame(p: DogPose): PixelGrid {
     const sy = 20 + s;
     if (a === 'down') out.line(sx, sy, sx + side * 1, sy + 5, 'ink');
     else if (a === 'out') out.line(sx, sy, sx + side * 4, sy - 2, 'ink').set(sx + side * 5, sy - 3, 'ink');
+    else if (a === 'point') out.line(sx, sy, sx + side * 5, sy - 9, 'ink').set(sx + side * 5, sy - 10, 'ink');
+    else if (a === 'low') out.line(sx, sy, sx - side * 3, sy + 5, 'ink').set(sx - side * 4, sy + 6, 'ink');
     else out.line(sx, sy, sx + side * 2, sy - 5, 'ink').line(sx + side * 2, sy - 5, sx + side * 1, sy - 8, 'ink');
   };
   arm(-1, p.armL);

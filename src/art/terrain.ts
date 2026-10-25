@@ -438,7 +438,7 @@ function seaTile(mask: number, frame: number, variant = 0): PixelGrid {
 // ---------------------------------------------------------------------------
 // Interiors (per cell)
 
-type FloorStyle = 'wood' | 'paper' | 'marble' | 'straw';
+type FloorStyle = 'wood' | 'paper' | 'marble' | 'straw' | 'disco';
 
 function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right', style: FloorStyle = 'wood'): PixelGrid {
   const g = new PixelGrid(T, T);
@@ -473,6 +473,16 @@ function floorTile(variant: number, shadow: 'none' | 'top' | 'left' | 'right', s
       const dir = hash2(variant, i, 91) < 0.5 ? 1 : -1;
       for (let k = 0; k < len; k++) g.set((x + k) % T, (y + (k * dir + T)) % T, i % 3 ? 'sand' : 'gold');
     }
+  } else if (style === 'disco') {
+    // Dark glossy tiles; the dance floor lights sit on top of these.
+    for (let y = 0; y < T; y++)
+      for (let x = 0; x < T; x++) {
+        const grout = x === 0 || y === 0;
+        const sheen = x + y === 4 + variant || x + y === 5 + variant;
+        g.set(x, y, grout ? 'ink' : sheen ? 'plum' : 'night');
+      }
+    dark = 'ink';
+    darker = 'ink';
   } else {
     // Polished stone: big pale slabs with thin grout and a soft sheen.
     for (let y = 0; y < T; y++)
@@ -531,8 +541,19 @@ function barnWalls(): PixelGrid[] {
   return [planks, lower, top];
 }
 
+/** A disco: dark violet walls with neon tubes running along them. */
+function discoWalls(): PixelGrid[] {
+  const upper = new PixelGrid(T, T);
+  for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) upper.set(x, y, (x + y * 3) % 11 === 0 ? 'violet' : 'night');
+  upper.fillRect(0, 9, T, 1, 'rose').fillRect(0, 10, T, 1, 'wine');
+  const lower = upper.clone().fillRect(0, 9, T, 2, 'night').fillRect(0, 6, T, 1, 'sky').fillRect(0, 7, T, 1, 'deep');
+  lower.fillRect(0, T - 3, T, 1, 'plum').fillRect(0, T - 2, T, 2, 'ink');
+  const top = upper.clone().fillRect(0, 0, T, 3, 'ink').fillRect(0, 3, T, 1, 'plum');
+  return [upper, lower, top];
+}
+
 /** Interior colourways, in tileset order (each is INTERIOR_TILE.altOffset tiles). */
-export const INTERIOR_STYLES = ['home', 'shop', 'paper', 'gallery', 'barn'] as const;
+export const INTERIOR_STYLES = ['home', 'shop', 'paper', 'gallery', 'barn', 'disco'] as const;
 
 function interiorTiles(): PixelGrid[] {
   const v = new PixelGrid(T, T).fillRect(0, 0, T, T, 'ink');
@@ -563,6 +584,10 @@ function interiorTiles(): PixelGrid[] {
     // Barn: straw on packed earth, plank walls.
     ...floors('straw'),
     ...barnWalls(),
+    v,
+    // Disco: dark tiles, neon-striped walls.
+    ...floors('disco'),
+    ...discoWalls(),
     v,
   ];
 }

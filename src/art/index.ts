@@ -5,6 +5,7 @@ import { PLAYER } from '../config';
 import { HEROES } from '../data/heroes';
 import { CHAR_FRAMES, buildCharacterFrames } from './characters';
 import { registerBuildings } from './buildings';
+import { registerDisco } from './disco';
 import { registerExtras } from './extras';
 import { registerFarmArt } from './farm';
 import { registerFx } from './fx';
@@ -26,6 +27,7 @@ export function registerAllArt(sink: TextureSink): void {
   }
   registerNpcArt(sink);
   registerExtras(sink);
+  registerDisco(sink);
   registerFarmArt(sink);
   registerIntroArt(sink);
 }

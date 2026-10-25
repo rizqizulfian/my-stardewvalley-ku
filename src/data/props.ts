@@ -4,6 +4,7 @@
 import { BUILDING_TEXTURES as B } from '../art/buildings';
 import { EXTRA_TEXTURES as X, PAINTINGS, SCULPTURES } from '../art/extras';
 import { VAN_GOGH } from '../art/vangogh';
+import { DISCO_BARN, DISCO_TEXTURES as DT } from '../art/disco';
 import { FARM_TEXTURES as FT, HIVE, WINDMILL } from '../art/farm';
 import { PROP_TEXTURES, bareTexture } from '../art/props';
 import type { ToolKind } from './items';
@@ -403,6 +404,23 @@ export const PROPS: Record<string, PropDef> = {
     ],
     surface: 'wood',
   },
+  // The disco barn and its insides. Animations run on the song's beat (about 165 bpm).
+  discoBarn: {
+    texture: DT.barn,
+    footprint: { w: 7, h: 3 },
+    collider: { x: 4, y: 8, w: 104, h: 38 },
+    offsetY: 1,
+    shadow: PROP_TEXTURES.shadowXL,
+    anim: { frames: DISCO_BARN.frames, ms: 364 },
+    lights: [
+      { x: -36, y: -31, texture: 'light-window', scale: 0.7 },
+      { x: 36, y: -31, texture: 'light-window', scale: 0.7 },
+    ],
+    surface: 'wood',
+  },
+  djBooth: { texture: DT.booth, footprint: { w: 3, h: 1 }, offsetX: 8, collider: { x: 2, y: 4, w: 44, h: 11 }, anim: { frames: 2, ms: 364 }, shadow: PROP_TEXTURES.shadowL },
+  speaker: { texture: DT.speaker, footprint: { w: 1, h: 1 }, collider: { x: 1, y: 6, w: 14, h: 9 }, anim: { frames: 2, ms: 182 }, shadow: PROP_TEXTURES.shadowS },
+  discoSign: { texture: DT.sign, footprint: { w: 3, h: 1 }, offsetX: 8, flat: true, offsetY: -1, anim: { frames: 6, ms: 364 } },
   nestBox: { texture: FT.nestBox, footprint: { w: 1, h: 1 }, collider: { x: 1, y: 6, w: 14, h: 9 }, shadow: PROP_TEXTURES.shadowS },
   manger: { texture: FT.manger, footprint: { w: 2, h: 1 }, collider: { x: 1, y: 6, w: 30, h: 9 }, shadow: PROP_TEXTURES.shadowL },
   ropePost: { texture: X.ropePost, footprint: { w: 1, h: 1 }, collider: { x: 0, y: 9, w: 16, h: 6 } },

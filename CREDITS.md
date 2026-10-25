@@ -10,6 +10,10 @@
   the project owner sent (it carried an Instagram watermark). The song's title, artist and licence are
   unknown: fine for a personal project, but find the source or replace the track before publishing.
 
+* **Disco song** in the disco barn on the farm. File: `public/audio/disco.ogg`, a looped cut from another short video
+  the project owner sent (Instagram watermark @omiljomil_kedaengee). Title, artist and licence unknown: same
+  caveat as the dog's song.
+
 All other music is generated live in code (`src/audio/GenerativeTrack.ts`, tracks in `src/data/music.ts`).
 
 ## Sound
@@ -20,7 +24,7 @@ Every sound effect and ambience layer (birds, crickets, wind, water, waves, gull
 ## Art
 
 All art except the player sprite (see Alvira below) is drawn by code at boot from the palette in `src/art/palette.ts`. The museum's paintings, sculptures
-and artists are made up for the game. The dancing dog is an original doodle inspired by a reference the
+and artists are made up for the game. The dancing dog and the disco puppy are original doodles inspired by references the
 project owner shared.
 
 ## Characters
