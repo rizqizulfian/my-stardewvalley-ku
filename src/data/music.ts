@@ -153,6 +153,13 @@ export const TRACKS: TrackDef[] = [
     gain: 0.4,
   },
   {
+    // The disco barn's song, from the clip the project owner sent (source unknown, see CREDITS.md).
+    kind: 'file',
+    id: 'disco',
+    url: 'audio/disco.ogg',
+    gain: 0.45,
+  },
+  {
     // The park: sunny and open, marimba over brushed drums.
     kind: 'generative',
     id: 'park-day',

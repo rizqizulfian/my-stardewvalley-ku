@@ -39,7 +39,7 @@ export interface MapDef {
   tillable?: boolean;
   /** Indoor maps: steady lighting, no sky effects. 'shop' picks the second wall colourway. */
   indoor?: boolean;
-  interiorStyle?: 'home' | 'shop' | 'paper' | 'gallery' | 'barn';
+  interiorStyle?: 'home' | 'shop' | 'paper' | 'gallery' | 'barn' | 'disco';
   /** Exits: stepping into the rectangle (cells) moves the player to another map. */
   warps?: WarpDef[];
   /** What signposts here say. */
@@ -50,6 +50,8 @@ export interface MapDef {
   entrance?: { blackMs: number; fadeMs: number };
   /** Where the dancing dog stands (feet cell). */
   dancer?: { x: number; y: number };
+  /** A disco: the light-up dance floor (cells, inclusive) and where the puppy dances under the mirror ball. */
+  disco?: { floor: { x0: number; y0: number; x1: number; y1: number }; puppy: { x: number; y: number } };
 }
 
 export interface WarpDef {
