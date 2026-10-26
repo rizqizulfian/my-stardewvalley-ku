@@ -1,6 +1,6 @@
 """Build public/sprites/alvira2.png ("Alvira 2.0 Testing") from Zulfian's frames.
 
-Usage: python3 tools/build_alvira2.py tools/src/alvira2 public/sprites/alvira2.png
+Usage: python3 tools/build_alvira2.py tools/src/alvira2 public/sprites/alvira2.png [tools/src/alvira2-dance]
 
 The frames (97x206, from "sprites alvira 2.0.zip") are a standing pose and four
 walk steps for each facing. The game draws at its own pixel size (the canvas is
@@ -13,6 +13,9 @@ skin is pulled to the drawing's light tone (the shrink darkens it next to the
 outline). Side walks alternate strides with the standing pose and bob up on
 it, so her legs visibly move instead of gliding.
 The layout matches CHAR_FRAMES in src/art/characters.ts.
+
+Her own dance (Zulfian's 16 frames, dance_01..16.png, "sprites.zip") goes after
+the four facings, one frame per cell from DANCE_START on (HeroDef.danceFrames).
 """
 import os
 import sys
@@ -37,18 +40,16 @@ WALK = {
     'right': [(12, 0), (None, 1), (24, 0), (None, 1)],
 }
 FACINGS = ['down', 'up', 'right', 'left']
+# The dance frames follow the 4 x 13 facing frames; must match HeroDef.danceFrames.
+DANCE_START = 52
+DANCE_COUNT = 16
+# The two halves of the dance were drawn at slightly different sizes (standing ~268 and
+# ~258 source pixels); each half is scaled so that she stands STAND_H tall.
+DANCE_BODY_H = [(range(1, 9), 268), (range(9, 17), 258)]
 
 
 def load(d, n):
-    """A frame without its magenta fringe, cropped."""
-    im = Image.open(os.path.join(d, 'frame_%03d.png' % n)).convert('RGBA')
-    px = im.load()
-    for y in range(im.height):
-        for x in range(im.width):
-            r, g, b, a = px[x, y]
-            if a < 140 or (r - g > 60 and b - g > 60):
-                px[x, y] = (0, 0, 0, 0)
-    return im.crop(im.getbbox())
+    return load_named(d, 'frame_%03d.png' % n)
 
 
 def scaled(im, s):
@@ -101,7 +102,30 @@ def outline(sheet):
     return sheet
 
 
-def main(src, out):
+def dance_cells(d):
+    cells = []
+    for n in range(1, DANCE_COUNT + 1):
+        im = load_named(d, 'dance_%02d.png' % n)
+        body_h = next(h for r, h in DANCE_BODY_H if n in r)
+        # Drawn a little greyer and softer than the walk frames: bring them up to match.
+        im = ImageEnhance.Contrast(ImageEnhance.Color(im).enhance(1.35)).enhance(1.2)
+        cells.append(cell(scaled(im, STAND_H / body_h)))
+    return cells
+
+
+def load_named(d, name):
+    """A frame without its magenta fringe, cropped."""
+    im = Image.open(os.path.join(d, name)).convert('RGBA')
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a < 140 or (r - g > 60 and b - g > 60):
+                px[x, y] = (0, 0, 0, 0)
+    return im.crop(im.getbbox())
+
+
+def main(src, out, dance=None):
     rows = []
     for facing in FACINGS:
         raw = load(src, STAND[facing])
@@ -120,14 +144,18 @@ def main(src, out):
             cell(stand.crop((0, 0, stand.width, int(stand.height * 0.8)))),  # sitting: the seat hides the legs
             cell(stand), cell(walk[0], lift=2), cell(stand), cell(walk[2], lift=2),  # dance: hop
         ])
-    sheet = Image.new('RGBA', (CELL_W * len(rows[0]), CELL_H * len(rows)))
-    for y, r in enumerate(rows):
-        for x, c in enumerate(r):
-            sheet.alpha_composite(c, (x * CELL_W, y * CELL_H))
+    cols = len(rows[0])
+    cells = [c for r in rows for c in r]
+    if dance:
+        assert len(cells) == DANCE_START
+        cells += dance_cells(dance)
+    sheet = Image.new('RGBA', (CELL_W * cols, CELL_H * -(-len(cells) // cols)))
+    for i, c in enumerate(cells):
+        sheet.alpha_composite(c, ((i % cols) * CELL_W, (i // cols) * CELL_H))
     sheet = outline(sheet)
     sheet.save(out, optimize=True)
     print(out, sheet.size)
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
