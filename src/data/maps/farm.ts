@@ -81,7 +81,7 @@ export const FARM_MAP: MapDef = {
   spawn: { x: 6, y: 13 },
   sign: 'Lembah Padi Farm. East: Kampung Padi.',
   seed: 1337,
-  decor: { flowers: 0.07, tufts: 0.12, pebbles: 0.02, meadow: 0.36, reeds: 0.45, lilies: 0.18 },
+  decor: { flowers: 0.07, tufts: 0.12, pebbles: 0.02, meadow: 0.17, reeds: 0.45, lilies: 0.18 },
   music: {
     morning: 'farm-morning',
     day: 'apple-cider',

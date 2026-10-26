@@ -24,7 +24,7 @@ export interface MapDef {
     reeds: number;
     /** Chance of a lily pad on open water. */
     lilies: number;
-    /** 0..1 coverage of darker meadow patches. */
+    /** Noise threshold for the flowery meadow patches (higher = more; 0.17 covers ~9% of the farm). */
     meadow: number;
   };
   /** Music track id per time of day. */
