@@ -19,6 +19,7 @@ const forcedRender = Number(new URLSearchParams(window.location.search).get('ren
 let renderCap: number = forcedRender || RENDER.maxRenderScale;
 let game: Phaser.Game | undefined;
 const listeners: Array<() => void> = [];
+const renderListeners: Array<(scale: number) => void> = [];
 
 function load(): number {
   try {
@@ -84,7 +85,9 @@ export function fitCamera(scene: Phaser.Scene): void {
 
 export function applyView(): void {
   if (!game) return;
+  const before = render;
   const v = fitView();
+  if (v.render !== before) renderListeners.forEach((fn) => fn(v.render));
   for (const s of game.scene.getScenes(false)) if (s.cameras?.main) fitCamera(s);
   game.scale.setZoom(v.zoom / v.render);
   game.scale.resize(v.width * v.render, v.height * v.render);
@@ -111,6 +114,11 @@ export function setZoomLevel(n: number): void {
 
 export function onZoomChange(fn: () => void): void {
   listeners.push(fn);
+}
+
+/** Called with the new canvas pixels per game pixel when the render scale changes. */
+export function onRenderChange(fn: (scale: number) => void): void {
+  renderListeners.push(fn);
 }
 
 /** Keyboard +/- and two-finger pinch on the canvas. */
