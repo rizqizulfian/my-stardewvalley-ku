@@ -4,7 +4,7 @@ import { CHAR_FRAMES, charFrame, type Facing } from '../art/characters';
 import { TOOL_BEHIND, TOOL_FRAME, TOOL_VIEWS, rodTip, toolTexture, type ToolView } from '../art/items';
 import { PROP_TEXTURES } from '../art/props';
 import type { ToolKind } from '../data/items';
-import { heroScale } from '../data/heroes';
+import { heroDance, heroScale } from '../data/heroes';
 import type { Box } from '../data/props';
 import type { Pose } from '../net/coop';
 import type { Surface } from '../data/terrain';
@@ -201,10 +201,12 @@ export class Player {
     }
   }
 
-  /** Dance on the spot for a number of beats. */
+  /** Dance on the spot for a number of beats. A farmer with her own dance plays it through to the end. */
   dance(beats: number, beatMs: number, onEnd?: () => void): boolean {
     this.facing = 'down';
-    return this.act({ tool: null, frames: new Array(beats).fill(beatMs), impact: -1, poses: CHAR_FRAMES.dance, onEnd });
+    const own = heroDance(this.sprite.texture.key);
+    if (own) beats = Math.ceil(beats / own.length) * own.length;
+    return this.act({ tool: null, frames: new Array(beats).fill(beatMs), impact: -1, poses: own ?? CHAR_FRAMES.dance, onEnd });
   }
 
   /** Turn to face a world point (used when aiming with the mouse). */

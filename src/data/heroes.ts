@@ -16,6 +16,8 @@ export interface HeroDef {
   /** Drawn farmers: PNG sheet in public/ (loaded by BootScene) with its cell size, drawn at `res`
    * sheet pixels per game pixel (shown at 1 / res). */
   sheet?: { url: string; frameWidth: number; frameHeight: number; res: number };
+  /** Her own dance: sheet frames played one per beat, in place of the shared four dance poses. */
+  danceFrames?: readonly number[];
   /** Generic farmers take the player's own name; this is the suggestion. */
   defaultName: string;
   namable: boolean;
@@ -65,6 +67,8 @@ export const HEROES: HeroDef[] = [
     label: 'Alvira 2.0 Testing',
     texture: 'char-alvira2',
     sheet: { url: 'sprites/alvira2.png', frameWidth: 22, frameHeight: 36, res: 1 },
+    // Zulfian's 16-step dance, after the 4 x 13 facing frames (DANCE_START in the build script).
+    danceFrames: Array.from({ length: 16 }, (_, i) => 52 + i),
     defaultName: 'Alvira',
     namable: false,
   },
@@ -81,6 +85,11 @@ export function heroDef(id: string): HeroDef {
 /** Display scale for a farmer's texture (1 / res for drawn sheets), by texture key. */
 export function heroScale(texture: string): number {
   return 1 / (HEROES.find((h) => h.texture === texture)?.sheet?.res ?? 1);
+}
+
+/** A farmer's own dance frames, by texture key (none: the shared dance poses). */
+export function heroDance(texture: string): readonly number[] | undefined {
+  return HEROES.find((h) => h.texture === texture)?.danceFrames;
 }
 
 export function cleanHeroName(raw: string): string {
