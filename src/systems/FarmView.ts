@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { DEPTH, RENDER } from '../config';
+import { hiresTileset } from '../art/hires';
 import { ITEM_TEXTURES, SOIL, SOIL_WET_OFFSET } from '../art/items';
 import { cropDef, soilOf } from './farming';
 import type { GameState } from './GameState';
@@ -27,7 +28,7 @@ export class FarmView {
   ) {
     this.tm = scene.make.tilemap({ tileWidth: T, tileHeight: T, width: map.w, height: map.h });
     const ts = this.tm.addTilesetImage('soil', ITEM_TEXTURES.soil, T, T, 0, 0, 1)!;
-    this.layer = this.tm.createBlankLayer('soil', ts, 0, 0, map.w, map.h)!;
+    this.layer = this.tm.createBlankLayer('soil', hiresTileset(ts), 0, 0, map.w, map.h)!;
     this.layer.setDepth(DEPTH.path + 0.2);
     this.refresh();
   }

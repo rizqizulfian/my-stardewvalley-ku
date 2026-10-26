@@ -5,6 +5,7 @@
 
 import Phaser from 'phaser';
 import { ATMOSPHERE, DEPTH, RENDER } from '../config';
+import { hiresTileset } from '../art/hires';
 import { hash2, valueNoise } from '../art/pixel';
 import {
   CLIFF_TILE,
@@ -89,17 +90,17 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
   const objects: Phaser.GameObjects.GameObject[] = [];
   const tm = scene.make.tilemap({ tileWidth: T, tileHeight: T, width: map.w + 1, height: map.h + 1 });
   const ts = {
-    grass: tm.addTilesetImage('grass', TERRAIN_TEXTURES.grass, T, T, 0, 0, GID.grass)!,
-    meadow: tm.addTilesetImage('meadow', TERRAIN_TEXTURES.meadow, T, T, 0, 0, GID.meadow)!,
-    path: tm.addTilesetImage('path', TERRAIN_TEXTURES.path, T, T, 0, 0, GID.path)!,
-    water: tm.addTilesetImage('water', TERRAIN_TEXTURES.water, T, T, 0, 0, GID.water)!,
-    deep: tm.addTilesetImage('deep', TERRAIN_TEXTURES.deepWater, T, T, 0, 0, GID.deep)!,
-    cliff: tm.addTilesetImage('cliff', TERRAIN_TEXTURES.cliff, T, T, 0, 0, GID.cliff)!,
-    sand: tm.addTilesetImage('sand', TERRAIN_TEXTURES.sand, T, T, 0, 0, GID.sand)!,
-    paved: tm.addTilesetImage('paved', TERRAIN_TEXTURES.paved, T, T, 0, 0, GID.paved)!,
-    sea: tm.addTilesetImage('sea', TERRAIN_TEXTURES.sea, T, T, 0, 0, GID.sea)!,
-    interior: tm.addTilesetImage('interior', TERRAIN_TEXTURES.interior, T, T, 0, 0, GID.interior)!,
-    dock: tm.addTilesetImage('dock', TERRAIN_TEXTURES.dock, T, T, 0, 0, GID.dock)!,
+    grass: hiresTileset(tm.addTilesetImage('grass', TERRAIN_TEXTURES.grass, T, T, 0, 0, GID.grass)!),
+    meadow: hiresTileset(tm.addTilesetImage('meadow', TERRAIN_TEXTURES.meadow, T, T, 0, 0, GID.meadow)!),
+    path: hiresTileset(tm.addTilesetImage('path', TERRAIN_TEXTURES.path, T, T, 0, 0, GID.path)!),
+    water: hiresTileset(tm.addTilesetImage('water', TERRAIN_TEXTURES.water, T, T, 0, 0, GID.water)!),
+    deep: hiresTileset(tm.addTilesetImage('deep', TERRAIN_TEXTURES.deepWater, T, T, 0, 0, GID.deep)!),
+    cliff: hiresTileset(tm.addTilesetImage('cliff', TERRAIN_TEXTURES.cliff, T, T, 0, 0, GID.cliff)!),
+    sand: hiresTileset(tm.addTilesetImage('sand', TERRAIN_TEXTURES.sand, T, T, 0, 0, GID.sand)!),
+    paved: hiresTileset(tm.addTilesetImage('paved', TERRAIN_TEXTURES.paved, T, T, 0, 0, GID.paved)!),
+    sea: hiresTileset(tm.addTilesetImage('sea', TERRAIN_TEXTURES.sea, T, T, 0, 0, GID.sea)!),
+    interior: hiresTileset(tm.addTilesetImage('interior', TERRAIN_TEXTURES.interior, T, T, 0, 0, GID.interior)!),
+    dock: hiresTileset(tm.addTilesetImage('dock', TERRAIN_TEXTURES.dock, T, T, 0, 0, GID.dock)!),
   };
   const layer = (name: string, tileset: Phaser.Tilemaps.Tileset, dual: boolean, depth: number) => {
     const l = tm.createBlankLayer(name, tileset, dual ? -HALF : 0, dual ? -HALF : 0, map.w + (dual ? 1 : 0), map.h + (dual ? 1 : 0))!;
