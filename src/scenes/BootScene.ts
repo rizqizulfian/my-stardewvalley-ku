@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { registerAllArt } from '../art';
-import { applyHires, preloadHires } from '../art/hires';
+import { applyHires, preloadHires, setHiresDensity } from '../art/hires';
 import { PhaserTextureSink } from '../art/pixel';
 import { HEROES } from '../data/heroes';
+import { onRenderChange, renderScale } from '../systems/viewZoom';
 
 /**
  * Loads the drawn farmers' PNG sheets and the hi-res world art, generates every other
@@ -22,7 +23,8 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     const t0 = performance.now();
     registerAllArt(new PhaserTextureSink(this.textures));
-    applyHires(this.textures);
+    applyHires(this.textures, renderScale());
+    onRenderChange(setHiresDensity);
     console.info(`[boot] art generated in ${Math.round(performance.now() - t0)} ms`);
     this.scene.start('World');
     this.scene.launch('UI');
