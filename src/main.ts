@@ -22,9 +22,9 @@ const view = fitView();
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent: 'game',
-  width: view.width,
-  height: view.height,
-  zoom: view.zoom,
+  width: view.width * view.render,
+  height: view.height * view.render,
+  zoom: view.zoom / view.render,
   backgroundColor: hex('ink'),
   pixelArt: true,
   roundPixels: true,

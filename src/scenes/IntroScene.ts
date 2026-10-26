@@ -16,6 +16,7 @@ import { hash2 } from '../art/pixel';
 import { addPanel } from '../ui/Panel';
 import { PixelText } from '../ui/PixelText';
 import { state } from '../systems/GameState';
+import { fitCamera, viewSize } from '../systems/viewZoom';
 
 const LAYOUT = {
   gap: 6,
@@ -79,7 +80,8 @@ export class IntroScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width: w, height: h } = this.scale;
+    fitCamera(this);
+    const { width: w, height: h } = viewSize(this);
     this.backdrop = this.add.rectangle(0, 0, w, h, hex('ink')).setOrigin(0, 0);
     this.frameG = this.add.graphics();
     this.stage = this.add.container(0, 0);
@@ -109,7 +111,7 @@ export class IntroScene extends Phaser.Scene {
   }
 
   private layout(): void {
-    const { width: w, height: h } = this.scale;
+    const { width: w, height: h } = viewSize(this);
     const total = INTRO.h + LAYOUT.gap + LAYOUT.textH;
     this.px = Math.round((w - INTRO.w) / 2);
     this.py = Math.max(LAYOUT.frame + 2, Math.round((h - total) / 2));

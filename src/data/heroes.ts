@@ -61,12 +61,12 @@ export const HEROES: HeroDef[] = [
   },
   { id: 'alvira', label: 'Alvira', texture: 'char-alvira', sheet: { url: 'sprites/alvira.png', frameWidth: 18, frameHeight: 30, res: 1 }, defaultName: 'Alvira', namable: false },
   // For testing Zulfian's new drawing (tools/build_alvira2.py); she is still Alvira in the story.
-  // Drawn bigger than the villagers so the drawing's details show (the canvas is at game resolution).
+  // A little bigger than the villagers, at 4 sheet pixels per game pixel so the drawing's details show.
   {
     id: 'alvira2',
     label: 'Alvira 2.0 Testing',
     texture: 'char-alvira2',
-    sheet: { url: 'sprites/alvira2.png', frameWidth: 22, frameHeight: 36, res: 1 },
+    sheet: { url: 'sprites/alvira2.png', frameWidth: 88, frameHeight: 144, res: 4 },
     // Zulfian's 16-step dance, after the 4 x 13 facing frames (DANCE_START in the build script).
     danceFrames: Array.from({ length: 16 }, (_, i) => 52 + i),
     defaultName: 'Alvira',

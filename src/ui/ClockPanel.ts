@@ -5,6 +5,7 @@ import { formatClock, timeOfDay, weekday } from '../systems/TimeSystem';
 import type { GameState } from '../systems/GameState';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
+import { viewSize } from '../systems/viewZoom';
 
 const LAYOUT = {
   width: 74,
@@ -28,7 +29,7 @@ export class ClockPanel {
 
   constructor(scene: Phaser.Scene) {
     this.container = scene.add.container(0, LAYOUT.margin);
-    this.layout(scene.scale.width);
+    this.layout(viewSize(scene).width);
     const panel = addPanel(scene, 0, 0, LAYOUT.width, LAYOUT.height);
     const ink = { color: 'night' as const, shadow: 'mist' as const };
     this.date = new PixelText(scene, LAYOUT.padX, LAYOUT.rowY[0], '', ink);

@@ -8,6 +8,7 @@ import type { DaySummary } from '../systems/day';
 import { itemDef } from '../systems/Inventory';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
+import { viewSize } from '../systems/viewZoom';
 
 const LAYOUT = {
   width: 220,
@@ -100,7 +101,7 @@ export class DaySummaryView {
     root.setAlpha(0);
     sc.tweens.add({ targets: root, alpha: 1, duration: 300 });
     this.blink = sc.time.addEvent({ delay: 500, loop: true, callback: () => press.setVisible(!press.visible) });
-    this.layout(sc.scale.width, sc.scale.height);
+    this.layout(viewSize(sc).width, viewSize(sc).height);
     if (s.total > 0) audio.playSfx('coin', 0.9);
   }
 

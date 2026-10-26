@@ -3,6 +3,7 @@ import { ITEM_TEXTURES, iconFrame } from '../art/items';
 import { itemDef } from '../systems/Inventory';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
+import { viewSize } from '../systems/viewZoom';
 
 const TOAST = {
   height: 22,
@@ -115,7 +116,7 @@ export class Notice {
   show(msg: string): void {
     this.scene.tweens.killTweensOf(this.text);
     this.text.setText(msg).setVisible(true).setAlpha(1);
-    this.layout(this.scene.scale.width, this.y, this.x);
+    this.layout(viewSize(this.scene).width, this.y, this.x);
     this.timer?.remove();
     this.timer = this.scene.time.delayedCall(1600 + msg.length * 40, () =>
       this.scene.tweens.add({ targets: this.text, alpha: 0, duration: 350, onComplete: () => this.text.setVisible(false) }),

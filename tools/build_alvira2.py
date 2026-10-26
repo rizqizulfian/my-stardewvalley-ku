@@ -3,11 +3,11 @@
 Usage: python3 tools/build_alvira2.py tools/src/alvira2 public/sprites/alvira2.png [tools/src/alvira2-dance]
 
 The frames (97x206, from "sprites alvira 2.0.zip") are a standing pose and four
-walk steps for each facing. The game draws at its own pixel size (the canvas is
-scaled up), so to keep the details of the drawing (sunglasses, flower clip,
-necklace, belt, studs, watch, bag, boots) she is drawn bigger than the
-villagers: STAND_H game pixels tall in a CELL_W x CELL_H cell, one sheet pixel
-per game pixel. Standing frames are scaled to one height and walk frames a
+walk steps for each facing. To keep the details of the drawing (sunglasses,
+flower clip, necklace, belt, studs, watch, bag, boots) she is a little bigger
+than the villagers (32 game pixels tall) and drawn at RES sheet pixels per game
+pixel, which the canvas shows since it renders up to 4x denser than the game
+grid (src/systems/viewZoom.ts). Standing frames are scaled to one height and walk frames a
 little lower (mid-step), anchored at the feet, given a dark outline, and her
 skin is pulled to the drawing's light tone (the shrink darkens it next to the
 outline). Side walks alternate strides with the standing pose and bob up on
@@ -22,8 +22,12 @@ import sys
 
 from PIL import Image, ImageEnhance, ImageFilter
 
-CELL_W, CELL_H = 22, 36  # must match HeroDef.sheet in src/data/heroes.ts
-STAND_H = 32
+# Sheet pixels per game pixel: the canvas is drawn up to 4x denser than the game grid
+# (RENDER.maxRenderScale), so she keeps 4x the detail at the same size on screen.
+RES = 4
+CELL_W, CELL_H = 22 * RES, 36 * RES  # must match HeroDef.sheet in src/data/heroes.ts
+STAND_H = 32 * RES
+OUTLINE_W = 2  # sheet pixels (half a game pixel)
 STEP = 0.95
 OUTLINE = (34, 22, 30, 255)
 SKIN = (255, 220, 170)
@@ -83,8 +87,9 @@ def head_center(im):
 
 
 def cell(im, lift=0):
+    """`lift` is in game pixels."""
     c = Image.new('RGBA', (CELL_W, CELL_H))
-    c.alpha_composite(im, (round(CELL_W / 2 - head_center(im)), CELL_H - im.height - lift))
+    c.alpha_composite(im, (round(CELL_W / 2 - head_center(im)), CELL_H - im.height - lift * RES))
     return c
 
 
@@ -152,7 +157,8 @@ def main(src, out, dance=None):
     sheet = Image.new('RGBA', (CELL_W * cols, CELL_H * -(-len(cells) // cols)))
     for i, c in enumerate(cells):
         sheet.alpha_composite(c, ((i % cols) * CELL_W, (i // cols) * CELL_H))
-    sheet = outline(sheet)
+    for _ in range(OUTLINE_W):
+        sheet = outline(sheet)
     sheet.save(out, optimize=True)
     print(out, sheet.size)
 

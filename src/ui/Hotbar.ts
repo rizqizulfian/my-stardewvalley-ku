@@ -7,6 +7,7 @@ import type { GameState, ItemStack } from '../systems/GameState';
 import { itemDef } from '../systems/Inventory';
 import { addPanel } from './Panel';
 import { PixelText } from './PixelText';
+import { viewSize } from '../systems/viewZoom';
 
 export const SLOT = { size: 20, gap: 1, pad: 5 } as const;
 
@@ -104,7 +105,7 @@ export class Hotbar {
 
   private showName(text: string): void {
     this.name.setText(text).setVisible(true).setAlpha(1);
-    this.name.x = Math.round((this.scene.scale.width - this.name.width) / 2);
+    this.name.x = Math.round((viewSize(this.scene).width - this.name.width) / 2);
     this.nameTimer?.remove();
     this.scene.tweens.killTweensOf(this.name);
     this.nameTimer = this.scene.time.delayedCall(LAYOUT.nameMs, () =>

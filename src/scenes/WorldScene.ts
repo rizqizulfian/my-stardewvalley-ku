@@ -40,6 +40,7 @@ import { ToolController } from '../systems/ToolController';
 import { overHud, uiState } from '../systems/uiState';
 import { WorldMap, type PlacedProp } from '../systems/WorldMap';
 import type { DialogRequest } from '../ui/DialogBox';
+import { fitCamera, viewSize } from '../systems/viewZoom';
 
 /** The notice board's line about tomorrow. */
 const FORECAST: Record<WeatherKind, string> = {
@@ -118,6 +119,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitCamera(this);
     this.def = MAPS[state.mapId];
     this.map = new WorldMap(this.def, new Set(state.removed[this.def.id] ?? []));
     const soil = soilOf(state, this.def.id);
@@ -767,7 +769,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private target(): [number, number] {
-    const cam = this.cameras.main;
+    const cam = viewSize(this);
     // Rooms smaller than the view sit in the middle of it.
     const fit = (size: number, view: number, focus: number) =>
       size <= view ? Math.round((size - view) / 2) : Phaser.Math.Clamp(focus - Math.floor(view / 2), 0, size - view);
