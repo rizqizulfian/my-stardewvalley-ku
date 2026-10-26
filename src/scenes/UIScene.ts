@@ -26,6 +26,7 @@ import type { TourData } from './TourScene';
 import { tourView } from './WorldScene';
 import { openCoopPanel } from '../ui/CoopPanel';
 import { closeHeroPicker, isHeroPickerOpen, openHeroPicker, type HeroChoice } from '../ui/HeroPicker';
+import { fitCamera, renderScale, viewSize } from '../systems/viewZoom';
 
 const PROMPT = {
   width: 150,
@@ -79,6 +80,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitCamera(this);
     this.clock = new ClockPanel(this);
     this.clock.update(state);
     bus.on(EV.minute, () => this.clock.update(state), this);
@@ -244,25 +246,26 @@ export class UIScene extends Phaser.Scene {
 
     this.showStartPrompt();
     const relayout = () => {
-      this.clock.layout(this.scale.width);
-      this.needs.layout(this.scale.width);
-      this.dialog.layout(this.scale.width, this.scale.height);
-      this.shop.layout(this.scale.width, this.scale.height);
-      this.settings.layout(this.scale.width, this.scale.height);
-      this.summary.layout(this.scale.width, this.scale.height);
-      const hb = this.hotbar.layout(this.scale.width, this.scale.height);
+      const view = viewSize(this);
+      this.clock.layout(view.width);
+      this.needs.layout(view.width);
+      this.dialog.layout(view.width, view.height);
+      this.shop.layout(view.width, view.height);
+      this.settings.layout(view.width, view.height);
+      this.summary.layout(view.width, view.height);
+      const hb = this.hotbar.layout(view.width, view.height);
       uiState.hudRects = [hb];
       // Phones: messages and pickups go top-left, under the Menu/Tas buttons,
       // since the joystick and action buttons sit around the hotbar.
-      const touchTop = Math.ceil(TOUCH_TOP_ROW / this.scale.zoom);
+      const touchTop = Math.ceil(TOUCH_TOP_ROW / (this.scale.zoom * renderScale()));
       if (touch) {
-        this.notice.layout(this.scale.width, touchTop, 4);
-        this.toasts.layout(this.scale.height, touchTop + 12);
+        this.notice.layout(view.width, touchTop, 4);
+        this.toasts.layout(view.height, touchTop + 12);
       } else {
-        this.notice.layout(this.scale.width, hb.y - 24);
-        this.toasts.layout(this.scale.height);
+        this.notice.layout(view.width, hb.y - 24);
+        this.toasts.layout(view.height);
       }
-      this.menu.layout(this.scale.width, this.scale.height);
+      this.menu.layout(view.width, view.height);
       // Below the on-screen Menu/Tas buttons on phones.
       this.help.y = touch ? touchTop : 4;
       if (this.prompt) this.centerPrompt(this.prompt);
@@ -351,7 +354,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   private centerPrompt(box: Phaser.GameObjects.Container): void {
-    box.setPosition(Math.round((this.scale.width - PROMPT.width) / 2), Math.round((this.scale.height - PROMPT.height) / 2));
+    const view = viewSize(this);
+    box.setPosition(Math.round((view.width - PROMPT.width) / 2), Math.round((view.height - PROMPT.height) / 2));
   }
 
   private showStartPrompt(): void {

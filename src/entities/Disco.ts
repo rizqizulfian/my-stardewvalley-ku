@@ -13,6 +13,7 @@ import type { MapDef } from '../data/maps/types';
 import type { Box } from '../data/props';
 import { worldDepth } from '../systems/MapRenderer';
 import { DiscoCrowd } from './DiscoCrowd';
+import { viewSize } from '../systems/viewZoom';
 
 const T = RENDER.tileSize;
 export { DISCO_BEAT_MS };
@@ -66,7 +67,7 @@ export class Disco {
       .setScrollFactor(0)
       .setDepth(DEPTH.lights)
       .setBlendMode(Phaser.BlendModes.ADD);
-    this.flash.setSize(scene.scale.width, scene.scale.height);
+    this.flash.setSize(viewSize(scene).width, viewSize(scene).height);
     this.shadow = scene.add.image(this.x, this.y - 1, PROP_TEXTURES.shadowL).setAlpha(0.3).setDepth(DEPTH.groundDecor + 0.5);
     this.puppy = scene.add.sprite(this.x, this.y + 2, DISCO_TEXTURES.puppy, 0).setOrigin(0.5, 1).setDepth(worldDepth(this.y));
     this.emote = scene.add.image(this.x, this.y - PUPPY.h - 4, FX_TEXTURES.emote, EMOTE.heart).setDepth(DEPTH.particlesAbove).setVisible(false);
@@ -110,7 +111,7 @@ export class Disco {
       this.drawFloor(beat);
       this.flash.setFillStyle(NEON_HEX[beat % NEON_HEX.length], 1);
     }
-    this.flash.setSize(this.scene.scale.width, this.scene.scale.height);
+    this.flash.setSize(viewSize(this.scene).width, viewSize(this.scene).height);
     // A soft colour wash on each beat, fading quickly.
     this.flash.setAlpha(0.07 * Math.max(0, 1 - inBeat * 2.5));
     this.puppy.setY(this.y + 2 - (inBeat < 0.3 ? 1 : 0));

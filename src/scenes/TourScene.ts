@@ -12,6 +12,7 @@ import { state } from '../systems/GameState';
 import { addPanel } from '../ui/Panel';
 import { PixelText } from '../ui/PixelText';
 import { tourView } from './WorldScene';
+import { fitCamera, viewSize } from '../systems/viewZoom';
 
 const T = RENDER.tileSize;
 const TIMING = {
@@ -60,6 +61,7 @@ export class TourScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitCamera(this);
     this.card = this.add.container(0, 0).setAlpha(0);
     this.box = addPanel(this, 0, 0, CARD.maxW, 40);
     this.title = new PixelText(this, CARD.pad, CARD.pad, '', { color: 'brick', shadow: 'sand', shadowRight: true }).setScale(CARD.titleScale);
@@ -94,7 +96,7 @@ export class TourScene extends Phaser.Scene {
   }
 
   private layout(): void {
-    const { width: w, height: h } = this.scale;
+    const { width: w, height: h } = viewSize(this);
     const cw = Math.min(CARD.maxW, w - CARD.margin * 2);
     this.caption.setStyle({ wrapWidth: cw - CARD.pad * 2 });
     this.fitCard(cw);
@@ -110,7 +112,7 @@ export class TourScene extends Phaser.Scene {
   }
 
   private setCard(title: string, caption: string, count: string): void {
-    const { width: w, height: h } = this.scale;
+    const { width: w, height: h } = viewSize(this);
     const cw = Math.min(CARD.maxW, w - CARD.margin * 2);
     this.title.setText(title);
     this.caption.setStyle({ wrapWidth: cw - CARD.pad * 2 }).setText(caption);

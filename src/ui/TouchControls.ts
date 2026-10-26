@@ -6,6 +6,7 @@
 import type Phaser from 'phaser';
 import { PALETTE } from '../art/palette';
 import { uiState } from '../systems/uiState';
+import { renderScale } from '../systems/viewZoom';
 
 type KeyDef = { key: string; code: string; keyCode: number };
 
@@ -277,10 +278,11 @@ export function installTouchControls(game: Phaser.Game): void {
     const vw = window.innerWidth;
     let bottom = GAP;
     if (cr && cr.height > 0) {
-      const scale = cr.height / game.scale.height;
+      const gameH = game.scale.height / renderScale();
+      const scale = cr.height / gameH;
       const canvasBottomGap = Math.max(0, vh - cr.bottom);
       const hb = uiState.hudRects[0];
-      const hbTop = hb ? (game.scale.height - hb.y) * scale : 0;
+      const hbTop = hb ? (gameH - hb.y) * scale : 0;
       bottom = canvasBottomGap + Math.max(hbTop, 0) + GAP;
     }
     const key = `${vw}x${vh}:${Math.round(bottom)}`;

@@ -7,6 +7,7 @@ import { FX_TEXTURES, LEAF_COLORS } from '../art/fx';
 import { PALETTE_RGB, COLOR_INDEX } from '../art/palette';
 import type { RenderedMap } from './MapRenderer';
 import { sampleGrade } from './TimeSystem';
+import { viewSize } from './viewZoom';
 
 interface Leaf {
   s: Phaser.GameObjects.Sprite;
@@ -80,7 +81,7 @@ export class Atmosphere {
   /** Full-screen layers follow the view size. */
   private fit(): void {
     const pad = 4;
-    const { width, height } = this.scene.scale;
+    const { width, height } = viewSize(this.scene);
     this.grade.setSize(width + pad * 2, height + pad * 2);
     this.glow.setSize(width + pad * 2, height + pad * 2);
     this.vignette.setDisplaySize(width, height);

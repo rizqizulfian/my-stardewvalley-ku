@@ -17,6 +17,10 @@ export const RENDER = {
   tileSize: 16,
   minZoom: 1,
   maxZoom: 8,
+  /** Most canvas pixels per game pixel (see viewZoom.ts); 4 matches Alvira 2.0's sheet. */
+  maxRenderScale: 4,
+  /** A device below minFps (checked every everyMs after warmupMs) gets a less dense canvas. */
+  renderFallback: { warmupMs: 6000, everyMs: 3000, minFps: 40 },
 } as const;
 
 /** Player zoom steps (+/-, pinch, Settings), as multiples of the default zoom. */

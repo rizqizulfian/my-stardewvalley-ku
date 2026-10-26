@@ -8,6 +8,7 @@ import { DEPTH } from '../config';
 import { FX_TEXTURES } from '../art/fx';
 import { audio } from '../audio/AudioManager';
 import type { Weather as WeatherKind } from './GameState';
+import { viewSize } from './viewZoom';
 
 interface FallDef {
   drops: number;
@@ -60,7 +61,7 @@ export class Weather {
     mapWidth: number,
     mapHeight: number,
   ) {
-    const { width, height } = scene.scale;
+    const { width, height } = viewSize(scene);
     this.def = kind === 'sun' ? null : KINDS[kind];
     this.grade = scene.add
       .rectangle(-4, -4, width + 8, height + 8, this.def?.grade ?? 0xffffff)
@@ -102,14 +103,14 @@ export class Weather {
   }
 
   private respawn(d: Drop, anywhere: boolean): void {
-    const { width, height } = this.scene.scale;
+    const { width, height } = viewSize(this.scene);
     d.x = Math.random() * (width + 60) - 40;
     d.y = anywhere ? Math.random() * height : -12 - Math.random() * 40;
     d.land = d.y + 40 + Math.random() * height;
   }
 
   update(timeMs: number, deltaMs: number): void {
-    const { width, height } = this.scene.scale;
+    const { width, height } = viewSize(this.scene);
     this.grade.setSize(width + 8, height + 8);
     this.flash.setSize(width + 8, height + 8);
     const def = this.def;
