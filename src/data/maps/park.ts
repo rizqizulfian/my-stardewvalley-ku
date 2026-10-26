@@ -74,7 +74,7 @@ export const PARK_MAP: MapDef = {
   spawn: { x: 1, y: 14 },
   sign: 'Taman Lembah. West: Pasar Lembah.',
   seed: 4242,
-  decor: { flowers: 0.12, tufts: 0.08, pebbles: 0.01, meadow: 0.15, reeds: 0.5, lilies: 0.3 },
+  decor: { flowers: 0.12, tufts: 0.08, pebbles: 0.01, meadow: 0.09, reeds: 0.5, lilies: 0.3 },
   music: { morning: 'park-day', day: 'park-day', evening: 'town-evening', night: 'farm-night' },
   ambience: { birds: 1, wind: 0.4, crickets: 0.9, water: 0.6 },
   backdrop: 'pine',

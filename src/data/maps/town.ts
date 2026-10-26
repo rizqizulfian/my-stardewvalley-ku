@@ -82,7 +82,7 @@ export const TOWN_MAP: MapDef = {
     'TAMAN LEMBAH, the new park east of the market: come and see the big fountain.',
   ],
   seed: 777,
-  decor: { flowers: 0.08, tufts: 0.08, pebbles: 0.02, meadow: 0.25, reeds: 0, lilies: 0 },
+  decor: { flowers: 0.08, tufts: 0.08, pebbles: 0.02, meadow: 0.15, reeds: 0, lilies: 0 },
   music: { morning: 'town-day', day: 'town-day', evening: 'town-evening', night: 'town-evening' },
   ambience: { birds: 0.7, wind: 0.5, crickets: 0.8, water: 0.35 },
   backdrop: 'pine',

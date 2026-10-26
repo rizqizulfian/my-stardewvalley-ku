@@ -148,7 +148,9 @@ export function renderMap(scene: Phaser.Scene, map: WorldMap, bare: (cx: number,
     for (let x = 0; x < map.w; x++) {
       if (TERRAIN[map.kindAt(x, y)].interior) continue;
       const r = hash2(x, y, seed);
-      const v = r < 0.45 ? 0 : 1 + Math.floor(hash2(x, y, seed + 1) * (GRASS_VARIANTS - 1));
+      let v = r < 0.45 ? 0 : 1 + Math.floor(hash2(x, y, seed + 1) * (GRASS_VARIANTS - 1));
+      // Variant 3 is the flowery one: keep only about a third of its picks.
+      if (v === 3 && hash2(x, y, seed + 2) > 0.35) v = 1;
       ground.putTileAt(GID.grass + v, x, y);
     }
 
